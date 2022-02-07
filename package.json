@@ -1,0 +1,27 @@
+{
+  "dependencies": {
+    "@serverless-stack/cli": "0.61.0",
+    "@serverless-stack/resources": "0.61.0",
+    "aws-cdk-lib": "2.7.0"
+  },
+  "devDependencies": {
+    "@tsconfig/node14": "^1.0.1",
+    "@types/aws-lambda": "^8.10.70",
+    "@types/node": "<15.0.0"
+  },
+  "eslintConfig": {
+    "extends": [
+      "serverless-stack"
+    ]
+  },
+  "name": "tgr-warden-outbound",
+  "private": true,
+  "scripts": {
+    "build": "sst build",
+    "deploy": "sst deploy",
+    "remove": "sst remove",
+    "start": "sst start",
+    "test": "sst test"
+  },
+  "version": "0.1.0"
+}

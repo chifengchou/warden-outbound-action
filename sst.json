@@ -1,0 +1,5 @@
+{
+  "main": "stacks/index.ts",
+  "name": "tgr-warden-outbound",
+  "region": "ap-southeast-1"
+}
