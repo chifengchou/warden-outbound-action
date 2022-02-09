@@ -1,6 +1,6 @@
 import { Template } from "aws-cdk-lib/assertions";
 import * as sst from "@serverless-stack/resources";
-import OutboundStack from "../stacks/OutboundStack";
+import OutboundStack from "../stacks/outboundStack";
 
 test("Test Stack", () => {
   const app = new sst.App();

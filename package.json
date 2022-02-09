@@ -21,7 +21,7 @@
     "deploy": "sst deploy",
     "remove": "sst remove",
     "start": "sst start",
-    "test": "sst test"
+    "build dev": "sst build --stage dev"
   },
   "version": "0.1.0"
 }

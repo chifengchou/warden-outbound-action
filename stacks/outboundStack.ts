@@ -1,11 +1,11 @@
 import * as sst from "@serverless-stack/resources";
 import {FunctionProps} from "@serverless-stack/resources";
-
+import {Stage} from "aws-cdk-lib";
 
 export default class OutboundStack extends sst.Stack {
   constructor(scope: sst.App, id: string, props?: sst.StackProps) {
     super(scope, id, props);
-    const prefix = `${scope.stage}-tgr-warden-outbound`
+    const prefix = `${scope.stage}-tgr-warden-outbound`;
     const bus = new sst.EventBus(this, "Bus");
     const transformationQueue = new sst.Queue(this, "TransformationQueue", {
       consumer: {
@@ -13,6 +13,7 @@ export default class OutboundStack extends sst.Stack {
           functionName: `${prefix}-transformation`,
           srcPath: "src",
           handler: "transformation.handler",
+          runtime: "python3.8",
         }
       },
     });
@@ -22,6 +23,7 @@ export default class OutboundStack extends sst.Stack {
           functionName: `${prefix}-sender`,
           srcPath: "src",
           handler: "sender.handler",
+          runtime: "python3.8",
         }
       }
     });
@@ -33,13 +35,13 @@ export default class OutboundStack extends sst.Stack {
         eventPattern: {
           detailType: ["outboundNotification"],
           detail: {
-            // either no route-state or in the end state(ready-to-send)
+            // either no route-state or not in the end state(ready-to-send)
             "route-state": [{exists: false}, {"anything-but": "ready-to-send"}]
           },
         },
         targets: [transformationQueue]
       }
-    })
+    });
     bus.addRules(this, {
       senderRule: {
         ruleName: `${prefix}-to-sender`,
@@ -47,14 +49,13 @@ export default class OutboundStack extends sst.Stack {
         eventPattern: {
           detailType: ["outboundNotification"],
           detail: {
-            // either no route-state or in the end state(ready-to-send)
+            // the end state(ready-to-send)
             "route-state": ["ready-to-send"]
           },
         },
         targets: [senderQueue]
       }
-    })
-
+    });
 
     // Temporarily create an HTTP API for testing
     const api = new sst.Api(this, "Api", {
@@ -62,15 +63,13 @@ export default class OutboundStack extends sst.Stack {
         "GET /": {
           srcPath: "src",
           handler: "producer.handler",
+          runtime: "python3.8",
           environment: {
             OUTBOUND_EVENT_BUS_ARN: bus.eventBusArn,
             OUTBOUND_EVENT_BUS_NAME: bus.eventBusName,
           },
         },
       }
-      //routes: {
-      //  "GET /": "producer.handler",
-      //},
     });
 
     // Show the endpoint in the output
