@@ -66,7 +66,7 @@ export default class CicdStack extends sst.Stack {
         effect: Effect.ALLOW,
         resources: [
           // FIXME: should only be ${stage}-tgr-warden-outbound-Pipeline
-          `arn:aws:secretsmanager:${scope.region}:${scope.account}:stack:*`
+          `arn:aws:cloudformation:ap-southeast-1:410801124909:stack/*`,
         ],
       }),
       new PolicyStatement({
