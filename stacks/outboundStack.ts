@@ -5,6 +5,7 @@ import {Stage} from "aws-cdk-lib";
 export default class OutboundStack extends sst.Stack {
   constructor(scope: sst.App, id: string, props?: sst.StackProps) {
     super(scope, id, props);
+
     const prefix = `${scope.stage}-tgr-warden-outbound`;
     const bus = new sst.EventBus(this, "Bus");
     const transformationQueue = new sst.Queue(this, "TransformationQueue", {

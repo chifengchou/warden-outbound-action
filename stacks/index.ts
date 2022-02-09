@@ -11,12 +11,16 @@ export default function main(app: sst.App): void {
     // In any of STAGES, we assume the intention is to deploy CI/CD.
     if (!app.local) {
       console.log(`Prepare pipeline for ${app.stage}`);
-      new CicdStack(app, "Pipeline")
+      new CicdStack(app, "Pipeline", {
+        stackName: `${app.stage}-tgr-warden-outbound-pipeline`
+      })
     } else {
       console.log(`sst start for ${app.stage} is not allowed`);
     }
   } else {
     console.log(`Prepare stack for ${app.stage}`)
-    new OutboundStack(app, "Stack");
+    new OutboundStack(app, "Stack", {
+      stackName: `${app.stage}-tgr-warden-outbound-stack`
+    });
   }
 }

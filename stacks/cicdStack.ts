@@ -71,18 +71,18 @@ export default class CicdStack extends sst.Stack {
         effect: Effect.ALLOW,
         resources: ["*"],
       }),
-      // Try solve this error in CodeBuild, which leads to failing to publish assets:
+      // Workaround this error in CodeBuild, which leads to failing to publish assets:
       // > current credentials could not be used to assume 'arn:aws:iam::410801124909:role/cdk-hnb659fds-deploy-role-410801124909-ap-southeast-1'
       new PolicyStatement({
         actions: ["sts:AssumeRole"],
         effect: Effect.ALLOW,
-        resources: ["*"],
+        resources: [`arn:aws:iam::${scope.account}:role/cdk-hnb659fds-*`],
       }),
     ];
     const synth = new CodeBuildStep("Build", {
       projectName: `${prefix}-build`,
       input,
-      //env: {}
+      //env: {},
       installCommands: [
         // Retrieving submodules
         //"mkdir -p /root/.ssh/",
@@ -108,7 +108,7 @@ export default class CicdStack extends sst.Stack {
       dockerEnabledForSynth: true,
       crossAccountKeys: false,
     })
-    pipeline.addStage(new OutboundStage(this, `${prefix}-stage`))
+    pipeline.addStage(new OutboundStage(this, "Stage"))
   }
 }
 
@@ -120,6 +120,8 @@ class OutboundStage extends Stage {
     //  Potentially it'll break. Note that sst.App <: cdk.App <: Stage.
     // eslint-disable-next-line @typescript-eslint/ban-ts-comment
     // @ts-ignore
-    new OutboundStack(this, "Stack");
+    new OutboundStack(this, "Stack", {
+      stackName: `${scope.stage}-tgr-warden-outbound-stack`
+    });
   }
 }
