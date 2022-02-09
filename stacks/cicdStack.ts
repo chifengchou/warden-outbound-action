@@ -3,7 +3,6 @@ import {CodeBuildStep, CodePipeline, CodePipelineSource, ShellStep} from "aws-cd
 import {Effect, PolicyStatement} from "aws-cdk-lib/aws-iam";
 import {Stage, StageProps} from "aws-cdk-lib";
 import OutboundStack from "./outboundStack";
-import { Construct } from "constructs";
 
 export const stages = ["dev", "staging", "prod"]
 
@@ -60,6 +59,14 @@ export default class CicdStack extends sst.Stack {
         effect: Effect.ALLOW,
         resources: [
           `arn:aws:secretsmanager:${scope.region}:${scope.account}:secret:${config.github_secret_name}*`
+        ],
+      }),
+      new PolicyStatement({
+        actions: ["cloudformation:DescribeStacks"],
+        effect: Effect.ALLOW,
+        resources: [
+          // FIXME: should only be ${stage}-tgr-warden-outbound-Pipeline
+          `arn:aws:secretsmanager:${scope.region}:${scope.account}:stack:*`
         ],
       }),
       new PolicyStatement({
