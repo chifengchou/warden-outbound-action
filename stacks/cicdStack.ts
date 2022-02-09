@@ -4,7 +4,7 @@ import {Effect, PolicyStatement} from "aws-cdk-lib/aws-iam";
 import {Stage, StageProps} from "aws-cdk-lib";
 import OutboundStack from "./outboundStack";
 
-export const stages = ["dev", "staging", "prod"]
+export const cicdStages = ["dev", "staging", "prod"]
 
 interface GitConnectionConfig {
   github_owner: string
@@ -126,10 +126,7 @@ export default class CicdStack extends sst.Stack {
 class OutboundStage extends Stage {
   constructor(scope: sst.Stack, id: string, props?: StageProps) {
     super(scope, id, props);
-    // FIXME: Lack of support of CodePipeline in sst out-of-box. We pass in a Stage where sst.App is required.
-    //  Potentially it'll break. Note that sst.App <: cdk.App <: Stage.
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-    // @ts-ignore
+    // Lack of support of CodePipeline in sst out-of-box. We pass in a Stage where sst.App is required.
     new OutboundStack(this, "Stack", {
       stackName: `${scope.stage}-tgr-warden-outbound-stack`
     });
