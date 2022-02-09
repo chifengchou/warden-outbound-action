@@ -61,14 +61,6 @@ export default class CicdStack extends sst.Stack {
           `arn:aws:secretsmanager:${scope.region}:${scope.account}:secret:${config.github_secret_name}*`
         ],
       }),
-      //new PolicyStatement({
-      //  actions: ["cloudformation:DescribeStacks"],
-      //  effect: Effect.ALLOW,
-      //  resources: [
-      //    // FIXME: should only be ${stage}-tgr-warden-outbound-Pipeline
-      //    `arn:aws:cloudformation:ap-southeast-1:410801124909:stack/*`,
-      //  ],
-      //}),
       new PolicyStatement({
         actions: ["ssm:GetParameter"],
         effect: Effect.ALLOW,
@@ -76,6 +68,13 @@ export default class CicdStack extends sst.Stack {
       }),
       new PolicyStatement({
         actions: ["ec2:Describe*"],
+        effect: Effect.ALLOW,
+        resources: ["*"],
+      }),
+      // Try solve this error in CodeBuild, which leads to failing to publish assets:
+      // > current credentials could not be used to assume 'arn:aws:iam::410801124909:role/cdk-hnb659fds-deploy-role-410801124909-ap-southeast-1'
+      new PolicyStatement({
+        actions: ["sts:AssumeRole"],
         effect: Effect.ALLOW,
         resources: ["*"],
       }),
