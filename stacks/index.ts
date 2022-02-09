@@ -15,7 +15,7 @@ export default function main(app: sst.App): void {
         stackName: `${app.stage}-tgr-warden-outbound-pipeline`
       })
     } else {
-      console.log(`sst start for ${app.stage} is not allowed`);
+      throw new Error(`sst start for ${app.stage} is not allowed`);
     }
   } else {
     console.log(`Prepare stack for ${app.stage}`)

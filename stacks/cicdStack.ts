@@ -14,7 +14,11 @@ interface GitConnectionConfig {
   github_secret_name: string
 }
 
-const cicdConfig: Record<string, GitConnectionConfig> = {
+interface StageConfig {
+  environment_id: string
+}
+
+const cicdConfig: Record<string, GitConnectionConfig & StageConfig> = {
   dev: {
     github_owner: "horangi-ir",
     github_repo: "tgr-warden-outbound",
@@ -22,6 +26,7 @@ const cicdConfig: Record<string, GitConnectionConfig> = {
     git_branch: "feature/cicd",
     github_connection_arn: "arn:aws:codestar-connections:ap-southeast-1:410801124909:connection/a6f85a35-6448-48ba-ad25-46bc9bb8caeb",
     github_secret_name: "tgr-dev-1-platform-github-ssh",
+    environment_id: "1",
   },
   staging: {
     github_owner: "horangi-ir",
@@ -29,6 +34,7 @@ const cicdConfig: Record<string, GitConnectionConfig> = {
     git_branch: "release/candidate",
     github_connection_arn: "",
     github_secret_name: "tgr-dev-1-platform-github-ssh",
+    environment_id: "1",
   },
   prod: {
     github_owner: "horangi-ir",
@@ -36,6 +42,7 @@ const cicdConfig: Record<string, GitConnectionConfig> = {
     git_branch: "master",
     github_connection_arn: "arn:aws:codestar-connections:ap-southeast-1:410801124909:connection/a6f85a35-6448-48ba-ad25-46bc9bb8caeb",
     github_secret_name: "tgr-dev-1-platform-github-ssh",
+    environment_id: "0",
   },
 };
 
@@ -45,7 +52,7 @@ export default class CicdStack extends sst.Stack {
     super(scope, id, props);
 
     const prefix = `${scope.stage}-tgr-warden-outbound`;
-    const config: GitConnectionConfig = cicdConfig[scope.stage]
+    const config = cicdConfig[scope.stage]
     const input = CodePipelineSource.connection(
       `${config.github_owner}/${config.github_repo}`,
       `${config.git_branch}`,
@@ -82,7 +89,10 @@ export default class CicdStack extends sst.Stack {
     const synth = new CodeBuildStep("Build", {
       projectName: `${prefix}-build`,
       input,
-      //env: {},
+      env: {
+        ENVIRONMENT_ID: config.environment_id,
+        ENVIRONMENT_MODE: scope.stage
+      },
       installCommands: [
         // Retrieving submodules
         //"mkdir -p /root/.ssh/",
