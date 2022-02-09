@@ -61,14 +61,14 @@ export default class CicdStack extends sst.Stack {
           `arn:aws:secretsmanager:${scope.region}:${scope.account}:secret:${config.github_secret_name}*`
         ],
       }),
-      new PolicyStatement({
-        actions: ["cloudformation:DescribeStacks"],
-        effect: Effect.ALLOW,
-        resources: [
-          // FIXME: should only be ${stage}-tgr-warden-outbound-Pipeline
-          `arn:aws:cloudformation:ap-southeast-1:410801124909:stack/*`,
-        ],
-      }),
+      //new PolicyStatement({
+      //  actions: ["cloudformation:DescribeStacks"],
+      //  effect: Effect.ALLOW,
+      //  resources: [
+      //    // FIXME: should only be ${stage}-tgr-warden-outbound-Pipeline
+      //    `arn:aws:cloudformation:ap-southeast-1:410801124909:stack/*`,
+      //  ],
+      //}),
       new PolicyStatement({
         actions: ["ssm:GetParameter"],
         effect: Effect.ALLOW,
@@ -98,7 +98,7 @@ export default class CicdStack extends sst.Stack {
         "npm install",
       ],
       commands: [
-        `npx sst deploy --stage ${scope.stage}`
+        `npx sst build --stage ${scope.stage}`
       ],
       primaryOutputDirectory: ".build/cdk.out",
       rolePolicyStatements,
@@ -106,7 +106,8 @@ export default class CicdStack extends sst.Stack {
     const pipeline = new CodePipeline(this, "Pipeline", {
       pipelineName: `${prefix}-pipeline`,
       synth,
-      dockerEnabledForSynth: true
+      dockerEnabledForSynth: true,
+      crossAccountKeys: false,
     })
     pipeline.addStage(new OutboundStage(this, `${prefix}-stage`))
   }
