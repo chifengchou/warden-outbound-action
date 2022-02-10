@@ -4,6 +4,7 @@ verify_ssl = true
 name = "pypi"
 
 [packages]
+tgr-backend-common = {editable = true, path = "./tgr-backend-common"}
 aws-lambda-powertools = {extras = ["pydantic"],version = "*"}
 devtools = "*"
 sentry-sdk = "*"
