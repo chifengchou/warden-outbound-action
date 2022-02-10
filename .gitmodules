@@ -1,0 +1,3 @@
+[submodule "src/tgr-backend-common"]
+	path = src/tgr-backend-common
+	url = git@github.com:horangi-ir/tgr-backend-common.git

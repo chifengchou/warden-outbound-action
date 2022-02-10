@@ -13,7 +13,7 @@ $ npm install
 - Ensure `saml2aws` has been properly configured in your system
 - Ensure `pipenv` is installed in your system
 - Ensure `aws` credentials properly configured in your system
-- Ensure `pre-commit` has been properly configured in your system
+- Ensure `pre-commit` has been properly configured in your systetm
 - Ensure `commitizen` has been properly configured in your system
 - Ensure `sentry-cli` has been properly configured in your system
 - [Optional] Ensure your terminal can handle `venv` and cli `env`

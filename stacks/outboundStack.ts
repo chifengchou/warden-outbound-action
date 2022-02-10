@@ -3,16 +3,19 @@ import {FunctionProps} from "@serverless-stack/resources";
 import {Stage} from "aws-cdk-lib";
 
 export default class OutboundStack extends sst.Stack {
-  // OutboundStack could be deployed from local or CodePipeline. The `scope` could be sst.App or Stage, respectively.
+  // FIXME: OutboundStack could be called locally or via CodePipeline. The `scope` could be sst.App or Stage,
+  //  respectively. This is a workaround as sst.App can't be directly added to CodePipeline as a Stage. Note that we
+  //  can not call utilities like `sst.App.setDefaultFunctionProps` because of this workaround.
   constructor(scope: sst.App|Stage, id: string, props?: sst.StackProps) {
     super(scope, id, props);
 
-    let prefix: string
+    let prefix: string;
     if (scope instanceof sst.App) {
       prefix = `${scope.stage}-tgr-warden-outbound`;
     } else {
       prefix = `${process.env.ENVIRONMENT_MODE}-tgr-warden-outbound`;
     }
+
     const bus = new sst.EventBus(this, "Bus");
     const transformationQueue = new sst.Queue(this, "TransformationQueue", {
       consumer: {

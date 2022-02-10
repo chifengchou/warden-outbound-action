@@ -111,14 +111,14 @@ export default class CicdStack extends sst.Stack {
       ],
       primaryOutputDirectory: ".build/cdk.out",
       rolePolicyStatements,
-    })
+    });
     const pipeline = new CodePipeline(this, "Pipeline", {
       pipelineName: `${prefix}-pipeline`,
       synth,
       dockerEnabledForSynth: true,
       crossAccountKeys: false,
-    })
-    pipeline.addStage(new OutboundStage(this, "Stage"))
+    });
+    pipeline.addStage(new OutboundStage(this, "Stage"));
   }
 }
 
@@ -126,7 +126,8 @@ export default class CicdStack extends sst.Stack {
 class OutboundStage extends Stage {
   constructor(scope: sst.Stack, id: string, props?: StageProps) {
     super(scope, id, props);
-    // Lack of support of CodePipeline in sst out-of-box. We pass in a Stage where sst.App is required.
+    // FIXME: We pass in a Stage(`this`) where sst.App is required. This is a workaround because the lack of support of
+    //  using sst.App in CodePipeline. See the implementation of OutboundStack.
     new OutboundStack(this, "Stack", {
       stackName: `${scope.stage}-tgr-warden-outbound-stack`
     });
