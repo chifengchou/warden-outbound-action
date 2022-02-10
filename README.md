@@ -8,29 +8,34 @@ Start by installing the dependencies.
 $ npm install
 ```
 
+## Prequisite to work effectively in this repo
+- Ensure Python is properly configured in your system
+- Ensure `saml2aws` has been properly configured in your system
+- Ensure `pipenv` is installed in your system
+- Ensure `aws` credentials properly configured in your system
+- Ensure `pre-commit` has been properly configured in your system
+- Ensure `commitizen` has been properly configured in your system
+- Ensure `sentry-cli` has been properly configured in your system
+- [Optional] Ensure your terminal can handle `venv` and cli `env`
+
 ## Commands
 
-### `npm run start`
 
-Starts the local Lambda development environment.
+Stage names `dev`, `staging` and `prod` are reserved for deploying CI/CD pipeline stack.
 
-### `npm run build`
+You can use other stage names to develop/deploy application stack.
 
-Build your app and synthesize your stacks.
 
-Generates a `.build/` directory with the compiled files and a `.build/cdk.out/` directory with the synthesized CloudFormation stacks.
+### Application stack
+* `npx sst start --stage ${your_stage}`: Starts the local application development environment.
+* `npx sst build --stage ${your_stage}`: Build and synthesize the application stack.
+* `npx sst deploy --stage ${your_stage}`: Deploy application to AWS.
 
-### `npm run deploy [stack]`
+### CICD/Pipeline stack
+* `npx sst build --stage dev|staging|prod`: Build and synthesize the CICD stack.
+* `npx sst deploy --stage dev|staging|prod`: Deploy CICD AWS.
 
-Deploy all your stacks to AWS. Or optionally deploy a specific stack.
 
-### `npm run remove [stack]`
-
-Remove all your stacks and all of their resources from AWS. Or optionally remove a specific stack.
-
-### `npm run test`
-
-Runs your tests using Jest. Takes all the [Jest CLI options](https://jestjs.io/docs/en/cli).
 
 ## Documentation
 
@@ -40,6 +45,3 @@ Learn more about the Serverless Stack.
 - [@serverless-stack/cli](https://docs.serverless-stack.com/packages/cli)
 - [@serverless-stack/resources](https://docs.serverless-stack.com/packages/resources)
 
-## Community
-
-[Follow us on Twitter](https://twitter.com/ServerlessStack) or [post on our forums](https://discourse.serverless-stack.com).
