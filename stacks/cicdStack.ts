@@ -58,6 +58,8 @@ export default class CicdStack extends sst.Stack {
       `${config.git_branch}`,
       {
         connectionArn: config.github_connection_arn,
+        // allow submodule
+        codeBuildCloneOutput: true,
       }
     );
     const rolePolicyStatements = [

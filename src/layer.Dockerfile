@@ -1,17 +1,4 @@
-# NOTE:
-# If you update this file, most likely you need to updte pytest.Dockerfile too
-
-FROM public.ecr.aws/lambda/python:3.8
-# https://docs.aws.amazon.com/lambda/latest/dg/images-create.html
-
-# https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/Lambda-Insights-Getting-Started-docker.html
-RUN curl -O https://lambda-insights-extension.s3-ap-northeast-1.amazonaws.com/amazon_linux/lambda-insights-extension.rpm && \
-    rpm -U lambda-insights-extension.rpm && \
-    rm -f lambda-insights-extension.rpm
-
-# Patch: https://alas.aws.amazon.com/AL2/ALAS-2021-1615.html
-# Patch: https://alas.aws.amazon.com/AL2/ALAS-2021-1638.html
-RUN yum update -y glibc openldap
+FROM public.ecr.aws/sam/build-python3.8:latest
 
 ENV PYTHONFAULTHANDLER=1 \
     PYTHONUNBUFFERED=1 \
