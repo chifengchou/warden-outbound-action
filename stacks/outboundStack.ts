@@ -1,6 +1,7 @@
 import * as sst from "@serverless-stack/resources";
-import {FunctionProps} from "@serverless-stack/resources";
-import {Stage} from "aws-cdk-lib";
+import {Stage, aws_lambda, StageProps} from "aws-cdk-lib";
+import fs_extra from "fs-extra";
+import glob from "glob";
 
 export default class OutboundStack extends sst.Stack {
   // FIXME: OutboundStack could be called locally or via CodePipeline. The `scope` could be sst.App or Stage,
@@ -16,14 +17,48 @@ export default class OutboundStack extends sst.Stack {
       prefix = `${process.env.ENVIRONMENT_MODE}-tgr-warden-outbound`;
     }
 
+    // NOTE: sst's bundling mechanism for python lambda function can not deal with editable dependencies(i.e.
+    // tgr-backend-common). Here is the workaround:
+    // 1. Use docker to package dependencies to a layer.
+    // 2. Create a build-xxx temp dir as the srcPath for sst to package lambdas. Copy src/*(without $excludeSrc) over.
+    const layer = new aws_lambda.LayerVersion(this, "Layer", {
+      layerVersionName: `${prefix}-layer`,
+      code: aws_lambda.Code.fromDockerBuild("src", {
+        file: "layer.Dockerfile",
+        // See layer.Dockerfile
+        imagePath: "/var/dependency",
+      }),
+    });
+    // Remove the previous temp dir
+    glob.sync("build-*").forEach(d => {
+      fs_extra.removeSync(d)
+    });
+    const srcPath = fs_extra.mkdtempSync("build-");
+    // We will use glob pattern to list files under src. By default, hidden files are ignored and only the first level
+    // files/directories are listed. We further exclude the result:
+    const srcExclude = [
+      // dependencies are handled in layer instead
+      "Pipfile", "Pipfile.lock", "requirements.txt", "poetry.lock", "pyproject.toml",
+      "tgr-backend-common",
+      // others
+      "__pycache__",
+    ]
+    glob.sync("src/*").forEach(f => {
+      const name = f.split("/")[1]
+      if (typeof name !== "undefined" && srcExclude.indexOf(name) === -1) {
+        fs_extra.copySync(`${f}`, `${srcPath}/${name}`)
+      }
+    });
+
     const bus = new sst.EventBus(this, "Bus");
     const transformationQueue = new sst.Queue(this, "TransformationQueue", {
       consumer: {
         function: {
           functionName: `${prefix}-transformation`,
-          srcPath: "src",
+          srcPath,
           handler: "transformation.handler",
           runtime: "python3.8",
+          layers: [layer],
         }
       },
     });
@@ -31,9 +66,10 @@ export default class OutboundStack extends sst.Stack {
       consumer: {
         function: {
           functionName: `${prefix}-sender`,
-          srcPath: "src",
+          srcPath,
           handler: "sender.handler",
           runtime: "python3.8",
+          layers: [layer],
         }
       }
     });
@@ -71,9 +107,11 @@ export default class OutboundStack extends sst.Stack {
     const api = new sst.Api(this, "Api", {
       routes: {
         "GET /": {
-          srcPath: "src",
+          functionName: `${prefix}-producer`,
+          srcPath,
           handler: "producer.handler",
           runtime: "python3.8",
+          layers: [layer],
           environment: {
             OUTBOUND_EVENT_BUS_ARN: bus.eventBusArn,
             OUTBOUND_EVENT_BUS_NAME: bus.eventBusName,

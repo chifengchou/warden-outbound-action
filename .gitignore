@@ -17,6 +17,7 @@
 .DS_Store
 .idea
 .vscode
+build-*
 
 # sst build output
 .build
