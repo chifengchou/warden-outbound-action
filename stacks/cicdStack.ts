@@ -100,7 +100,7 @@ export default class CicdStack extends sst.Stack {
         "mkdir -p /root/.ssh/",
         "touch /root/.ssh/known_hosts",
         "ssh-keyscan github.com >> /root/.ssh/known_hosts",
-        `aws secretsmanager get-secret-value --secret-id ${config.github_secret_name} | jq -r ".SecretString" > /root/.ssh/temp_rsa`,
+        `aws secretsmanager get-secret-value --secret-id ${config.github_secret_name} | jq -r .SecretString > /root/.ssh/temp_rsa`,
         "chmod 400 /root/.ssh/temp_rsa",
         'eval "$(ssh-agent -s)" && ssh-add /root/.ssh/temp_rsa',
         "git submodule update --init --recursive",
