@@ -1,63 +1,29 @@
 import * as sst from "@serverless-stack/resources";
-import {CodeBuildStep, CodePipeline, CodePipelineSource, ShellStep} from "aws-cdk-lib/pipelines";
+import {CodeBuildStep, CodePipeline, CodePipelineSource } from "aws-cdk-lib/pipelines";
 import {Effect, PolicyStatement} from "aws-cdk-lib/aws-iam";
 import {Stage, StageProps} from "aws-cdk-lib";
 import OutboundStack from "./outboundStack";
-
-export const cicdStages = ["dev", "staging", "prod"]
-
-interface GitConnectionConfig {
-  github_owner: string
-  github_repo: string
-  git_branch: string
-  github_connection_arn: string
-  github_secret_name: string
-}
-
-interface StageConfig {
-  environment_id: string
-}
-
-const cicdConfig: Record<string, GitConnectionConfig & StageConfig> = {
-  dev: {
-    github_owner: "horangi-ir",
-    github_repo: "tgr-warden-outbound",
-    //git_branch: "develop",
-    git_branch: "feature/cicd",
-    github_connection_arn: "arn:aws:codestar-connections:ap-southeast-1:410801124909:connection/a6f85a35-6448-48ba-ad25-46bc9bb8caeb",
-    github_secret_name: "tgr-dev-1-platform-github-ssh",
-    environment_id: "1",
-  },
-  staging: {
-    github_owner: "horangi-ir",
-    github_repo: "tgr-warden-outbound",
-    git_branch: "release/candidate",
-    github_connection_arn: "",
-    github_secret_name: "tgr-dev-1-platform-github-ssh",
-    environment_id: "1",
-  },
-  prod: {
-    github_owner: "horangi-ir",
-    github_repo: "tgr-warden-outbound",
-    git_branch: "master",
-    github_connection_arn: "arn:aws:codestar-connections:ap-southeast-1:410801124909:connection/a6f85a35-6448-48ba-ad25-46bc9bb8caeb",
-    github_secret_name: "tgr-dev-1-platform-github-ssh",
-    environment_id: "0",
-  },
-};
+import {Config} from "./config";
 
 
 export default class CicdStack extends sst.Stack {
   constructor(scope: sst.App, id: string, props?: sst.StackProps) {
     super(scope, id, props);
 
+    const cicdStages = Config.getCicdStageNames()
+    if (scope.stage || cicdStages.indexOf(scope.stage) === -1) {
+      new Error(`Deploying CICD to stage ${scope.stage} is not allowed`)
+    }
+    const config = Config.getConfig(scope.stage)
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const gitProps = config.gitProps!
     const prefix = `${scope.stage}-tgr-warden-outbound`;
-    const config = cicdConfig[scope.stage]
+
     const input = CodePipelineSource.connection(
-      `${config.github_owner}/${config.github_repo}`,
-      `${config.git_branch}`,
+      `${gitProps.githubOwner}/${gitProps.githubRepo}`,
+      `${gitProps.gitBranch}`,
       {
-        connectionArn: config.github_connection_arn,
+        connectionArn: gitProps.githubConnectionArn,
         // allow submodule
         codeBuildCloneOutput: true,
       }
@@ -67,7 +33,7 @@ export default class CicdStack extends sst.Stack {
         actions: ["secretsmanager:GetSecretValue"],
         effect: Effect.ALLOW,
         resources: [
-          `arn:aws:secretsmanager:${scope.region}:${scope.account}:secret:${config.github_secret_name}*`
+          `arn:aws:secretsmanager:${scope.region}:${scope.account}:secret:${gitProps.githubSecretName}*`
         ],
       }),
       new PolicyStatement({
@@ -92,15 +58,15 @@ export default class CicdStack extends sst.Stack {
       projectName: `${prefix}-build`,
       input,
       env: {
-        ENVIRONMENT_ID: config.environment_id,
-        ENVIRONMENT_MODE: scope.stage
+        ENVIRONMENT_ID: config.stageProps.environmentId,
+        ENVIRONMENT_MODE: config.stageProps.environmentMode,
       },
       installCommands: [
         // Retrieving submodules
         "mkdir -p /root/.ssh/",
         "touch /root/.ssh/known_hosts",
         "ssh-keyscan github.com >> /root/.ssh/known_hosts",
-        `aws secretsmanager get-secret-value --secret-id ${config.github_secret_name} | jq -r .SecretString > /root/.ssh/temp_rsa`,
+        `aws secretsmanager get-secret-value --secret-id ${gitProps.githubSecretName} | jq -r .SecretString > /root/.ssh/temp_rsa`,
         "chmod 400 /root/.ssh/temp_rsa",
         'eval "$(ssh-agent -s)" && ssh-add /root/.ssh/temp_rsa',
         "git submodule update --init --recursive",
