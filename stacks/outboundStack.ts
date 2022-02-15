@@ -3,11 +3,41 @@ import {Stage, Fn, aws_iam as iam, aws_lambda as lambda, aws_ec2 as ec2 } from "
 import fs_extra from "fs-extra";
 import glob from "glob";
 import {Config} from "./config";
-import {FunctionDefinition} from "@serverless-stack/resources";
 
 export default class OutboundStack extends sst.Stack {
 
-  private add_managed_policy(config: Config, role: iam.IRole, idPrefix: string) {
+  private prepare_src_path(): string {
+    /*
+    Create a temp Build-xxx dir as the srcPath for lambdas. Copy only needed application files over there.
+    Dependency management files are intentionally left out because we don't want to use SST's bundling mechanism.
+     */
+    // Remove any previous temp dirs
+    glob.sync("build-*").forEach(d => {
+      fs_extra.removeSync(d)
+    });
+    const srcPath = fs_extra.mkdtempSync("build-");
+    // We will use glob pattern to list files under src. By default, hidden files are ignored and only the first level
+    // files/directories are listed. We further exclude the result:
+    const srcExclude = [
+      // dependencies are handled in layer instead
+      "Pipfile", "Pipfile.lock", "requirements.txt", "poetry.lock", "pyproject.toml",
+      "tgr-backend-common",
+      // others
+      "__pycache__",
+    ]
+    glob.sync("src/*").forEach(f => {
+      const name = f.split("/")[1]
+      if (name && srcExclude.indexOf(name) === -1) {
+        fs_extra.copySync(`${f}`, `${srcPath}/${name}`)
+      }
+    });
+    return srcPath
+  }
+
+  private add_managed_policy(config: Config, role: iam.IRole, idPrefix: string): void {
+    /*
+    Add additional policies to the given role.
+     */
     role.addManagedPolicy(
       iam.ManagedPolicy.fromAwsManagedPolicyName("CloudWatchLambdaInsightsExecutionRolePolicy"))
     role.addManagedPolicy(
@@ -18,10 +48,10 @@ export default class OutboundStack extends sst.Stack {
         Fn.importValue(`${config.platformStackName}-mpolicy-lambda-xray`)))
   }
 
-  // FIXME: OutboundStack could be called directly(i.e. `scope: sst.App`) or via CodePipeline(i.e. `scope: Stage`).
-  //  Specifying scope to be a union type is a workaround. Note that we can not call utilities like
-  //  `sst.App.setDefaultFunctionProps` without checking scope's type..
   constructor(scope: sst.App|Stage, id: string, props?: sst.StackProps) {
+    // FIXME: OutboundStack could be called directly(i.e. `scope: sst.App`) or via CodePipeline(i.e. `scope: Stage`).
+    //  Specifying scope to be a union type is a workaround. Note that we can not call utilities like
+    //  `sst.App.setDefaultFunctionProps` without checking scope's type..
     super(scope, id, props);
 
     const cicdStages = Config.getCicdStageNames()
@@ -44,10 +74,10 @@ export default class OutboundStack extends sst.Stack {
     const config = Config.getConfig(stage)
     const prefix = `${stage}-tgr-warden-outbound`;
 
-    // NOTE: sst's bundling mechanism for python lambda function can not deal with editable dependencies(i.e.
+    // NOTE: SST's bundling mechanism for python lambda function can not deal with editable dependencies(i.e.
     // tgr-backend-common). Here is the workaround:
     // 1. Use docker to package dependencies to a layer.
-    // 2. Create a build-xxx temp dir as the srcPath for sst to package lambdas. Copy src/*(without $excludeSrc) over.
+    // 2. Create a build-xxx temp dir as the srcPath that contains only needed application files.
     const layer = new lambda.LayerVersion(this, "Layer", {
       layerVersionName: `${prefix}-layer`,
       code: lambda.Code.fromDockerBuild("src", {
@@ -56,29 +86,9 @@ export default class OutboundStack extends sst.Stack {
         imagePath: "/var/dependency",
       }),
     });
-    // Remove the previous temp dir
-    glob.sync("build-*").forEach(d => {
-      fs_extra.removeSync(d)
-    });
-    const srcPath = fs_extra.mkdtempSync("build-");
-    // We will use glob pattern to list files under src. By default, hidden files are ignored and only the first level
-    // files/directories are listed. We further exclude the result:
-    const srcExclude = [
-      // dependencies are handled in layer instead
-      "Pipfile", "Pipfile.lock", "requirements.txt", "poetry.lock", "pyproject.toml",
-      "tgr-backend-common",
-      // others
-      "__pycache__",
-    ]
-    glob.sync("src/*").forEach(f => {
-      const name = f.split("/")[1]
-      if (name && srcExclude.indexOf(name) === -1) {
-        fs_extra.copySync(`${f}`, `${srcPath}/${name}`)
-      }
-    });
+    const srcPath = this.prepare_src_path()
 
     const bus = new sst.EventBus(this, "Bus");
-
     const commonFunctionProps = {
       srcPath,
       runtime: lambda.Runtime.PYTHON_3_8,
@@ -131,7 +141,20 @@ export default class OutboundStack extends sst.Stack {
     // Instead of create a role in commonFunctionPros, we post-add policies to the auto-created role on which sst/cdk
     // sets up some policies for us.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    this.add_managed_policy(config, transQueue.consumerFunction!.role!, "TransFn")
+    const transFn = transQueue.consumerFunction!
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    this.add_managed_policy(config, transFn.role!, "TransFn")
+    // transformation handler shuld be able to putEvents to the bus.
+    // `transFn.attachPermissions([[bus, "putEvents"]])` does not work at the moment
+    transFn.attachPermissions([
+      new iam.PolicyStatement({
+        actions: ["events:putEvents"],
+        effect: iam.Effect.ALLOW,
+        resources: [
+          bus.eventBusArn,
+        ]
+      })
+    ])
 
     const senderQueue = new sst.Queue(this, "SenderQueue", {
       consumer: {
@@ -176,26 +199,8 @@ export default class OutboundStack extends sst.Stack {
       }
     });
 
-    // Temporarily create an HTTP API for testing
-    const api = new sst.Api(this, "Api", {
-      routes: {
-        "GET /": {
-          functionName: `${prefix}-producer`,
-          handler: "producer.handler",
-          ...commonFunctionProps,
-        },
-      }
-    });
-    api.routes.forEach((r, index) => {
-      // Instead of create a role in commonFunctionPros, we post-add policies to the auto-created role on which sst/cdk
-      // sets up some policies for us.
-      // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-      this.add_managed_policy(config, api.getFunction(r)!.role!, `Route${index}`)
-    })
-
     // Show the endpoint in the output
     this.addOutputs({
-      "ApiEndpoint": api.url,
       "BusArn": bus.eventBusArn,
       "BusName": bus.eventBusName,
     });

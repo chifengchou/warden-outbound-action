@@ -25,9 +25,9 @@ Stage names `dev`, `staging` and `prod` are reserved for deploying CI/CD pipelin
 
 You can use other stage names to develop/deploy application stack.
 
+Because we don't package our lambda dependencies in sst's way, `sst start` does not work anymore.
 
 ### Application stack
-* `npx sst start --stage ${your_stage}`: Starts the local application development environment.
 * `npx sst build --stage ${your_stage}`: Build and synthesize the application stack.
 * `npx sst deploy --stage ${your_stage}`: Deploy application to AWS.
 
