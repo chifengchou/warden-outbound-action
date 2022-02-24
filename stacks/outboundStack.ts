@@ -90,7 +90,7 @@ export default class OutboundStack extends sst.Stack {
 
     const bus = new sst.EventBus(this, "Bus", {
       eventBridgeEventBus: {
-        eventBusName: `{prefix}-bus`,
+        eventBusName: `${prefix}-bus`,
       }
     });
     const commonFunctionProps = {
