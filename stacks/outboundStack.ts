@@ -135,7 +135,10 @@ export default class OutboundStack extends sst.Stack {
           functionName: `${prefix}-transformation`,
           handler: "transformation.handler",
           ...commonFunctionProps,
-        }
+        },
+        consumerProps: {
+          reportBatchItemFailures: true,
+        },
       },
     });
     // Instead of create a role in commonFunctionPros, we post-add policies to the auto-created role on which sst/cdk
@@ -144,7 +147,7 @@ export default class OutboundStack extends sst.Stack {
     const transFn = transQueue.consumerFunction!
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     this.add_managed_policy(config, transFn.role!, "TransFn")
-    // transformation handler shuld be able to putEvents to the bus.
+    // transformation handler should be able to putEvents to the bus.
     // `transFn.attachPermissions([[bus, "putEvents"]])` does not work at the moment
     transFn.attachPermissions([
       new iam.PolicyStatement({
@@ -162,23 +165,38 @@ export default class OutboundStack extends sst.Stack {
           functionName: `${prefix}-sender`,
           handler: "sender.handler",
           ...commonFunctionProps,
-        }
-      }
+        },
+        consumerProps: {
+          reportBatchItemFailures: true,
+        },
+      },
     });
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    const senderFn = senderQueue.consumerFunction!
     // Instead of create a role in commonFunctionPros, we post-add policies to the auto-created role on which sst/cdk
     // sets up some policies for us.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
-    this.add_managed_policy(config, senderQueue.consumerFunction!.role!, "SenderFn")
+    this.add_managed_policy(config, senderFn.role!, "SenderFn")
+    // sender handler should be able to publish to the sns.
+    senderFn.attachPermissions([
+      new iam.PolicyStatement({
+        actions: ["sns:publish"],
+        effect: iam.Effect.ALLOW,
+        resources: [
+          "*",
+        ]
+      })
+    ])
 
     bus.addRules(this, {
       transformationRule: {
         ruleName: `${prefix}-to-transformation`,
         description: "events to be transformed",
         eventPattern: {
-          detailType: ["outboundNotification"],
+          detailType: ["OutboundNotification"],
           detail: {
-            // either no route-state or not in the end state(ready-to-send)
-            "route-state": [{exists: false}, {"anything-but": "ready-to-send"}]
+            // either no route-state or not in the end state(ready_to_send)
+            "msg_attrs.route": [{exists: false}, {"anything-but": "ready_to_send"}],
           },
         },
         targets: [transQueue]
@@ -189,10 +207,10 @@ export default class OutboundStack extends sst.Stack {
         ruleName: `${prefix}-to-sender`,
         description: "events to be sent",
         eventPattern: {
-          detailType: ["outboundNotification"],
+          detailType: ["OutboundNotification"],
           detail: {
-            // the end state(ready-to-send)
-            "route-state": ["ready-to-send"]
+            // the end state(ready_to_send)
+            "msg_attrs.route": ["ready_to_send"]
           },
         },
         targets: [senderQueue]
