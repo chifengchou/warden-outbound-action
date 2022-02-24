@@ -88,7 +88,11 @@ export default class OutboundStack extends sst.Stack {
     });
     const srcPath = this.prepare_src_path()
 
-    const bus = new sst.EventBus(this, "Bus");
+    const bus = new sst.EventBus(this, "Bus", {
+      eventBridgeEventBus: {
+        eventBusName: `{prefix}-bus`,
+      }
+    });
     const commonFunctionProps = {
       srcPath,
       runtime: lambda.Runtime.PYTHON_3_8,
