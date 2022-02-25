@@ -223,8 +223,14 @@ export default class OutboundStack extends sst.Stack {
 
     // Show the endpoint in the output
     this.addOutputs({
-      "BusArn": bus.eventBusArn,
-      "BusName": bus.eventBusName,
+      busArn: {
+        value: bus.eventBusArn,
+        exportName: `${prefix}-bus-arn`,
+      },
+      busName: {
+        value: bus.eventBusName,
+        exportName: `${prefix}-bus-name`,
+      }
     });
   }
 }
