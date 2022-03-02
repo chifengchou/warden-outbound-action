@@ -114,23 +114,23 @@ export default class OutboundStack extends sst.Stack {
             Fn.importValue(`${config.networkLayerStackName}-subnet-app-c-id`)),
         ]
       },
-      environment: {
-        SENTRY_DSN: config.stageProps.sentryDsn,
-        ENVIRONMENT_MODE: config.stageProps.environmentMode,
-        ENVIRONMENT_ID: config.stageProps.environmentId,
-        DATABASE_PASSWORD_SECRET_KEY: Fn.importValue(
-          `${config.dataLayerStackName}-secret-postgres-user-storyfier-arn`),
-        DATABASE_NAME: config.stageProps.databaseName,
-        DATABASE_USERNAME: config.stageProps.databaseUserName,
-        DATABASE_HOST: Fn.importValue(
-          `${config.dataLayerStackName}-dbcluster-platform-clusterendpoint-address`),
-        LOG_LEVEL: config.stageProps.logLevel,
-        OUTBOUND_EVENT_BUS_ARN: bus.eventBusArn,
-        OUTBOUND_EVENT_BUS_NAME: bus.eventBusName,
-        // https://awslabs.github.io/aws-lambda-powertools-python/
-        POWERTOOLS_LOGGER_LOG_EVENT: `${config.stageProps.environmentMode !== "prod"}`,
-        POWERTOOLS_EVENT_HANDLER_DEBUG: `${config.stageProps.environmentMode !== "prod"}`,
-      },
+    }
+    const environment = {
+      SENTRY_DSN: config.stageProps.sentryDsn,
+      ENVIRONMENT_MODE: config.stageProps.environmentMode,
+      ENVIRONMENT_ID: config.stageProps.environmentId,
+      DATABASE_PASSWORD_SECRET_KEY: Fn.importValue(
+        `${config.dataLayerStackName}-secret-postgres-user-storyfier-arn`),
+      DATABASE_NAME: config.stageProps.databaseName,
+      DATABASE_USERNAME: config.stageProps.databaseUserName,
+      DATABASE_HOST: Fn.importValue(
+        `${config.dataLayerStackName}-dbcluster-platform-clusterendpoint-address`),
+      LOG_LEVEL: config.stageProps.logLevel,
+      OUTBOUND_EVENT_BUS_ARN: bus.eventBusArn,
+      OUTBOUND_EVENT_BUS_NAME: bus.eventBusName,
+      // https://awslabs.github.io/aws-lambda-powertools-python/
+      POWERTOOLS_METRICS_NAMESPACE: "outbound",
+      POWERTOOLS_LOGGER_LOG_EVENT: `${config.stageProps.environmentMode !== "prod"}`,
     }
 
     const transQueue = new sst.Queue(this, "TransQueue", {
@@ -139,6 +139,10 @@ export default class OutboundStack extends sst.Stack {
           functionName: `${prefix}-transformation`,
           handler: "transformation.handler",
           ...commonFunctionProps,
+          environment: {
+            ...environment,
+            POWERTOOLS_SERVICE_NAME: "transformation",
+          }
         },
         consumerProps: {
           reportBatchItemFailures: true,
@@ -169,6 +173,10 @@ export default class OutboundStack extends sst.Stack {
           functionName: `${prefix}-sender`,
           handler: "sender.handler",
           ...commonFunctionProps,
+          environment: {
+            ...environment,
+            POWERTOOLS_SERVICE_NAME: "sender",
+          }
         },
         consumerProps: {
           reportBatchItemFailures: true,
