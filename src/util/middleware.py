@@ -5,11 +5,11 @@ from aws_lambda_powertools.middleware_factory import lambda_handler_decorator
 from horangi.models.core import init_database_engine
 from sqlalchemy.pool import NullPool
 
-from constant import SERVICE, SQL_ECHO
+from constant import SQL_ECHO
 
 from .db import get_database_connection_url
 
-logger = Logger(SERVICE)
+logger = Logger(child=True)
 
 
 @lambda_handler_decorator
