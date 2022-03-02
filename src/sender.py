@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
@@ -15,24 +16,35 @@ from horangi import IS_AWS
 from horangi.signals.message import Message
 from horangi.signals.message_util import register
 
-from constant import LOG_LEVEL, SERVICE, SQL_ECHO
+from constant import LOG_LEVEL, SQL_ECHO
 from model.sns_summary import SnsSummaryV1
 from util.middleware import middleware_db_connect
 
-logger = Logger(service=SERVICE, level=logging.getLevelName(LOG_LEVEL))
-logger.info(f"{SERVICE=}, {IS_AWS=}, {LOG_LEVEL=}, {SQL_ECHO=}")
+POWERTOOLS_METRICS_NAMESPACE = os.environ.get(
+    "POWERTOOLS_METRICS_NAMESPACE", "outbound"
+)
+POWERTOOLS_SERVICE_NAME = os.environ.get("POWERTOOLS_SERVICE_NAME")
+
+if not POWERTOOLS_SERVICE_NAME:
+    raise AssertionError("env POWERTOOLS_SERVICE_NAME is not set.")
+
+logger = Logger(level=logging.getLevelName(LOG_LEVEL))
+logger.info(
+    f"{POWERTOOLS_METRICS_NAMESPACE=}, {POWERTOOLS_SERVICE_NAME=}, {IS_AWS=}, "
+    f"{LOG_LEVEL=}, {SQL_ECHO=}"
+)
 
 # NOTE: To disable tracing set ENV:
 #   POWERTOOLS_TRACE_DISABLED="1"
 #   POWERTOOLS_TRACE_MIDDLEWARES="False"
-tracer = Tracer(service=SERVICE)
-# TODO: metrics need service/namespace/segment/dimension
-metrics = Metrics(service=SERVICE, namespace="sender")
+tracer = Tracer()
+metrics = Metrics()
 
 # Infra must enable "Report Batch Item Failures"
 processor = BatchProcessor(event_type=EventType.SQS)
 
 
+@tracer.capture_method(capture_response=False)
 def send_sns_summary(m: Message[SnsSummaryV1], **_) -> None:
     topic_arn = m.content.sns_topic_arn
     logger.debug(f"send_sns_summary for {topic_arn=}")
@@ -51,7 +63,7 @@ def send_sns_summary(m: Message[SnsSummaryV1], **_) -> None:
 register(msg_cls=Message[SnsSummaryV1], receiver=send_sns_summary)
 
 
-@tracer.capture_method
+@tracer.capture_method(capture_response=False)
 def record_handler(record: SQSRecord):
     # TODO: handler should be in a nested db transaction
     logger.info(record.raw_event)

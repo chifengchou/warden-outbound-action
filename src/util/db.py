@@ -5,9 +5,7 @@ from functools import lru_cache
 from aws_lambda_powertools import Logger
 from horangi import IS_AWS, PLATFORM_FN_SECRET, get_lambda_client
 
-from constant import SERVICE
-
-logger = Logger(SERVICE)
+logger = Logger(child=True)
 
 
 @lru_cache(maxsize=1)

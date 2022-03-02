@@ -1,7 +1,9 @@
 import json
 import logging
-from typing import Any, Dict, Iterable, List, Tuple
+import os
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
+import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
 from aws_lambda_powertools.utilities.batch import (
     BatchProcessor,
@@ -35,21 +37,30 @@ from horangi.signals.message_storyfier import IndexCompleteV1
 from horangi.signals.message_util import register
 from pydantic import BaseModel, Field
 
-from constant import LOG_LEVEL, SERVICE, SQL_ECHO
+from constant import LOG_LEVEL, OUTBOUND_EVENT_BUS_NAME, SQL_ECHO
 from model.sns_summary import AggregatedByRule, Resource, SnsSummaryV1
-from util.eventbus import put_events
 from util.middleware import middleware_db_connect
 
-logger = Logger(service=SERVICE, level=logging.getLevelName(LOG_LEVEL))
-logger.info(f"{SERVICE=}, {IS_AWS=}, {LOG_LEVEL=}, {SQL_ECHO=}")
+POWERTOOLS_METRICS_NAMESPACE = os.environ.get(
+    "POWERTOOLS_METRICS_NAMESPACE", "outbound"
+)
+POWERTOOLS_SERVICE_NAME = os.environ.get("POWERTOOLS_SERVICE_NAME")
 
+if not POWERTOOLS_SERVICE_NAME:
+    raise AssertionError("Env var POWERTOOLS_SERVICE_NAME is not set.")
+
+
+logger = Logger(level=logging.getLevelName(LOG_LEVEL))
+logger.info(
+    f"{POWERTOOLS_METRICS_NAMESPACE=}, {POWERTOOLS_SERVICE_NAME=}, {IS_AWS=}, "
+    f"{LOG_LEVEL=}, {SQL_ECHO=}"
+)
 
 # NOTE: To disable tracing set ENV:
 #   POWERTOOLS_TRACE_DISABLED="1"
 #   POWERTOOLS_TRACE_MIDDLEWARES="False"
-tracer = Tracer(service=SERVICE)
-# TODO: metrics need service/namespace/segment/dimension
-metrics = Metrics(service=SERVICE, namespace="transformation")
+tracer = Tracer()
+metrics = Metrics()
 
 # Infra must enable "Report Batch Item Failures"
 processor = BatchProcessor(event_type=EventType.SQS)
@@ -63,8 +74,8 @@ class DestinationConfiguration(BaseModel):
 
     destination_uid: str
     is_enabled: bool = False
-    # filters for now only supports severities, e.g.
-    # `"severities": [ "low", "high" ]`
+    # NOTE: filters for now only supports severities, e.g.
+    #  `"severities": [ "low", "high" ]`
     filters: Dict[str, Any] = Field(default_factory=dict)
 
 
@@ -111,6 +122,7 @@ def get_enabled_destination(
             continue
 
 
+@tracer.capture_method(capture_response=False)
 def get_aggregated_by_rules(
     org_uid,
     task_uid,
@@ -216,26 +228,31 @@ def get_aggregated_by_rules(
     return list(rules.values())
 
 
+@tracer.capture_method(capture_response=False)
 def create_summary_for_sns(m: Message[IndexCompleteV1], **_) -> None:
     task_uid = m.content.task_uid
     logger.debug(f"create_summary_for_sns for {task_uid=}")
     action: Action = session.query(Action).get(m.content.action_uid)
 
-    msgs = []
+    entries = []
+    # NOTE: For now all destinations share the same "filters". Therefore, we
+    #  only query aggregated once.
+    aggregated: Optional[List[AggregatedByRule]] = None
     for config, destination in get_enabled_destination(
         action, DestinationType.aws_sns
     ):  # noqa
         try:
             logger.debug(f"Process {destination.uid=}")
-            rules = get_aggregated_by_rules(
-                action.org_uid, task_uid, config.filters
-            )  # noqa
+            if aggregated is None:
+                aggregated = get_aggregated_by_rules(
+                    action.org_uid, task_uid, config.filters
+                )
             summary = SnsSummaryV1(
                 sns_topic_arn=destination.sns_topic_arn,
                 cloud_provider=action.cloud_provider_type,
                 action_group_name=action.action_group.name,
                 target_name=action.target_name,
-                rules=rules,
+                rules=aggregated,
             )
             msg = Message[SnsSummaryV1](
                 msg_type="SnsSummary",
@@ -244,24 +261,32 @@ def create_summary_for_sns(m: Message[IndexCompleteV1], **_) -> None:
                 # Route to sender
                 msg_attrs={"route": "ready_to_send"},
             )
-            logger.info(msg)
-            msgs.append(msg)
+            logger.debug(msg)
+            entries.append(
+                {
+                    'EventBusName': OUTBOUND_EVENT_BUS_NAME,
+                    'Source': POWERTOOLS_SERVICE_NAME,
+                    'DetailType': "OutboundNotification",
+                    'Detail': msg.json(),
+                }
+            )
         except Exception:
             logger.exception(
                 f"Failed to create summary for {destination.uid}. Continue"
             )
             # ignore
 
-    logger.info(f"Send {len(msgs)} events")
-    if msgs:
-        resp = put_events(msgs, source="transformation")
+    logger.info(f"Send {len(entries)} events")
+    if entries:
+        client = boto3.client("events")
+        resp = client.put_events(Entries=entries)
         logger.info(resp)
 
 
 register(msg_cls=Message[IndexCompleteV1], receiver=create_summary_for_sns)
 
 
-@tracer.capture_method
+@tracer.capture_method(capture_response=False)
 def record_handler(record: SQSRecord):
     # TODO: handler should be in a nested db transaction
     logger.info(record.raw_event)
