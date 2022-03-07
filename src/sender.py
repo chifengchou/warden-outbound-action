@@ -17,7 +17,7 @@ from horangi.signals.message import Message
 from horangi.signals.message_util import register
 
 from constant import LOG_LEVEL, SQL_ECHO
-from model.sns_summary import SnsSummaryV1
+from model.sns_summary import SnsSummaryInputV1
 from util.middleware import middleware_db_connect
 
 POWERTOOLS_METRICS_NAMESPACE = os.environ.get(
@@ -48,22 +48,20 @@ processor = BatchProcessor(event_type=EventType.SQS)
 
 
 @tracer.capture_method(capture_response=False)
-def send_sns_summary(m: Message[SnsSummaryV1], **_) -> None:
+def send_sns_summary(m: Message[SnsSummaryInputV1], **_) -> None:
     topic_arn = m.content.sns_topic_arn
     logger.debug(f"send_sns_summary for {topic_arn=}")
 
-    content = m.content.dict()
-    # remove unwanted fields
-    content.pop("sns_topic_arn", None)
-
+    summary = m.content.summary.json()
     client = boto3.client("sns")
-    client.publish(
-        Message=json.dumps(content),
+    resp = client.publish(
+        Message=summary,
         TopicArn=topic_arn,
     )
+    logger.info(resp)
 
 
-register(msg_cls=Message[SnsSummaryV1], receiver=send_sns_summary)
+register(msg_cls=Message[SnsSummaryInputV1], receiver=send_sns_summary)
 
 
 @tracer.capture_method(capture_response=False)

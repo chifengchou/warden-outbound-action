@@ -37,7 +37,7 @@ from horangi.signals.message_storyfier import IndexCompleteV1
 from horangi.signals.message_util import register
 
 from constant import LOG_LEVEL, OUTBOUND_EVENT_BUS_NAME, SQL_ECHO
-from model.sns_summary import AggregatedByRule, Resource, SnsSummaryV1
+from model.sns_summary import Resource, Rule, SnsSummaryInputV1, SnsSummaryV1
 from util.middleware import middleware_db_connect
 from util.query import query_enabled_destinations
 
@@ -74,7 +74,7 @@ def get_aggregated_by_rules(
     org_uid,
     task_uid,
     filters,
-) -> List[AggregatedByRule]:
+) -> List[Rule]:
     if filters and filters.get("severities"):
         severities = filters.get('severities')
     else:
@@ -138,7 +138,7 @@ def get_aggregated_by_rules(
     )
     # NOTE: Within a single scan(task), a resource should only appear at most
     #  once for a rule.
-    rules: Dict[str, AggregatedByRule] = dict()
+    rules: Dict[str, Rule] = dict()
     for row in rows:
         try:
             if row.resource_gid:
@@ -163,7 +163,7 @@ def get_aggregated_by_rules(
             tags = list(filter(lambda t: t.startswith("compliance:"), row.tags))  # noqa
             aggregated = rules.get(row.title)
             if aggregated is None:
-                aggregated = AggregatedByRule(
+                aggregated = Rule(
                     rule=row.title,
                     default_severity=row.default_severity,
                     resources=[resource],
@@ -191,7 +191,7 @@ def create_summary_for_sns(m: Message[IndexCompleteV1], **_) -> None:
     entries = []
     # NOTE: For now all destinations share the same "filters". Therefore, we
     #  only query aggregated once.
-    aggregated: Optional[List[AggregatedByRule]] = None
+    aggregated: Optional[List[Rule]] = None
     for config, destination in query_enabled_destinations(
         action.action_group, DestinationType.aws_sns
     ):  # noqa
@@ -201,17 +201,19 @@ def create_summary_for_sns(m: Message[IndexCompleteV1], **_) -> None:
                 aggregated = get_aggregated_by_rules(
                     action.org_uid, task_uid, config.filters
                 )
-            summary = SnsSummaryV1(
+            content = SnsSummaryInputV1(
                 sns_topic_arn=destination.sns_topic_arn,
-                cloud_provider=action.cloud_provider_type,
-                action_group_name=action.action_group.name,
-                target_name=action.target_name,
-                rules=aggregated,
+                summary=SnsSummaryV1(
+                    cloud_provider=action.cloud_provider_type,
+                    scan_group=action.action_group.name,
+                    target_name=action.target_name,
+                    rules=aggregated,
+                ),
             )
-            msg = Message[SnsSummaryV1](
-                msg_type="SnsSummary",
+            msg = Message[SnsSummaryInputV1](
+                msg_type="SnsSummaryInput",
                 version="1",
-                content=summary,
+                content=content,
                 # Route to sender
                 msg_attrs={"route": "ready_to_send"},
             )

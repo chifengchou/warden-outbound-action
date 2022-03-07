@@ -16,7 +16,7 @@ class DestinationConfiguration(BaseModel):
     """
 
     destination_uid: str
-    is_enabled: bool = False
+    is_enabled: bool = True
     # NOTE: filters for now only supports severities, e.g.
     #  `"severities": [ "low", "high" ]`
     filters: Optional[Dict[str, Any]] = Field(default_factory=dict)
