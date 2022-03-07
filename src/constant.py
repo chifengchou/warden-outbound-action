@@ -1,6 +1,9 @@
 import os
+from pathlib import Path
 
 from horangi import IS_AWS
+
+SRC_DIR = Path(__file__).parent.absolute()
 
 LOG_LEVEL = os.environ.get('LOG_LEVEL', "INFO")
 

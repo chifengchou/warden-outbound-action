@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
@@ -27,7 +27,6 @@ from horangi.models import (
     ScanFindingsDefinitionMapping,
 )
 from horangi.models.core import session
-from horangi.models.storyfier import Destination
 from horangi.querybakery.baked_queries import (
     query_check_history_contexts,
     query_filtered_checks,
@@ -35,11 +34,11 @@ from horangi.querybakery.baked_queries import (
 from horangi.signals.message import Message
 from horangi.signals.message_storyfier import IndexCompleteV1
 from horangi.signals.message_util import register
-from pydantic import BaseModel, Field
 
 from constant import LOG_LEVEL, OUTBOUND_EVENT_BUS_NAME, SQL_ECHO
 from model.sns_summary import AggregatedByRule, Resource, SnsSummaryV1
 from util.middleware import middleware_db_connect
+from util.query import query_enabled_destinations
 
 POWERTOOLS_METRICS_NAMESPACE = os.environ.get(
     "POWERTOOLS_METRICS_NAMESPACE", "outbound"
@@ -47,7 +46,10 @@ POWERTOOLS_METRICS_NAMESPACE = os.environ.get(
 POWERTOOLS_SERVICE_NAME = os.environ.get("POWERTOOLS_SERVICE_NAME")
 
 if not POWERTOOLS_SERVICE_NAME:
-    raise AssertionError("Env var POWERTOOLS_SERVICE_NAME is not set.")
+    if IS_AWS:
+        raise AssertionError("Env var POWERTOOLS_SERVICE_NAME is not set.")
+    else:
+        POWERTOOLS_SERVICE_NAME = "transformation"
 
 
 logger = Logger(level=logging.getLevelName(LOG_LEVEL))
@@ -64,62 +66,6 @@ metrics = Metrics()
 
 # Infra must enable "Report Batch Item Failures"
 processor = BatchProcessor(event_type=EventType.SQS)
-
-
-class DestinationConfiguration(BaseModel):
-    """
-    DestinationConfiguration models elements in
-    ActionGroup.destination_configurations
-    """
-
-    destination_uid: str
-    is_enabled: bool = False
-    # NOTE: filters for now only supports severities, e.g.
-    #  `"severities": [ "low", "high" ]`
-    filters: Dict[str, Any] = Field(default_factory=dict)
-
-
-def get_enabled_destination(
-    action: Action, destination_type: DestinationType
-) -> Iterable[Tuple[DestinationConfiguration, Destination]]:
-    """
-    A generator yields Tuple[DestinationConfig, Destination]
-    """
-    if action.action_type != ActionType.cloud_scan.value:
-        logger.info(f"Only {ActionType.cloud_scan} is supported")
-        return
-    destination_configurations = action.action_group.destination_configuration
-    if not destination_configurations:
-        logger.info(
-            f'No destination configuration for action group '
-            f'{action.action_group_uid}'
-        )
-        return
-
-    for dc in destination_configurations:
-        try:
-            config = DestinationConfiguration.parse_obj(dc)
-            destination_uid = config.destination_uid
-            if not config.is_enabled:
-                logger.info(f"{destination_uid=} is disabled")
-                continue
-            logger.info(f"Processing {destination_uid=} ")
-            destination = (
-                session.query(Destination)
-                .filter(
-                    Destination.uid == destination_uid,
-                    Destination.destination_type == destination_type.value,
-                )
-                .one_or_none()
-            )
-            if not destination:
-                logger.warning(f'No destination for {destination_uid=}')
-                continue
-            yield config, destination
-        except Exception:
-            logger.exception(f"Fail to process {dc}")
-            # ignored
-            continue
 
 
 @tracer.capture_method(capture_response=False)
@@ -233,13 +179,16 @@ def create_summary_for_sns(m: Message[IndexCompleteV1], **_) -> None:
     task_uid = m.content.task_uid
     logger.debug(f"create_summary_for_sns for {task_uid=}")
     action: Action = session.query(Action).get(m.content.action_uid)
+    if action.action_type != ActionType.cloud_scan.value:
+        logger.info(f"Only {ActionType.cloud_scan} is supported")
+        return
 
     entries = []
     # NOTE: For now all destinations share the same "filters". Therefore, we
     #  only query aggregated once.
     aggregated: Optional[List[AggregatedByRule]] = None
-    for config, destination in get_enabled_destination(
-        action, DestinationType.aws_sns
+    for config, destination in query_enabled_destinations(
+        action.action_group, DestinationType.aws_sns
     ):  # noqa
         try:
             logger.debug(f"Process {destination.uid=}")

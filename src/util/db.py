@@ -23,8 +23,6 @@ def get_database_connection_url():
         logger.debug(f"{db_user=}, {db_host=}, {db_name}")
         return db_url
     else:
-        # TODO: IS_SAM_LOCAL
-
         db_host = os.environ.get('DATABASE_HOST', 'localhost:5432')
         # TODO:
         logger.debug(f"{db_host=}")

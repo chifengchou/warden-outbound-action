@@ -26,7 +26,10 @@ POWERTOOLS_METRICS_NAMESPACE = os.environ.get(
 POWERTOOLS_SERVICE_NAME = os.environ.get("POWERTOOLS_SERVICE_NAME")
 
 if not POWERTOOLS_SERVICE_NAME:
-    raise AssertionError("env POWERTOOLS_SERVICE_NAME is not set.")
+    if IS_AWS:
+        raise AssertionError("env POWERTOOLS_SERVICE_NAME is not set.")
+    else:
+        POWERTOOLS_SERVICE_NAME = "sender"
 
 logger = Logger(level=logging.getLevelName(LOG_LEVEL))
 logger.info(
