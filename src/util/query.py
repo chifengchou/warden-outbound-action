@@ -1,11 +1,12 @@
 from typing import Iterable, Tuple
 
 from aws_lambda_powertools import Logger
-from horangi.destinations import DestinationConfiguration
 from horangi.generated.destination_type import DestinationType
 from horangi.models import ActionGroup
 from horangi.models.core import session
 from horangi.models.storyfier import Destination
+
+from model.destination_configuration import DestinationConfiguration
 
 logger = Logger(child=True)
 
