@@ -14,7 +14,7 @@ class Resource(BaseModel):
     service: str
     severity: str
     # gid is None if is_service
-    gid: Optional[str] = Field(description="Resource gid")
+    gid: Optional[str] = Field(None, description="Resource gid")
     note: Optional[str]
 
 

@@ -20,6 +20,7 @@ from horangi.constants import (
     CheckResult,
     DestinationType,
 )
+from horangi.generated.severity_level import SeverityLevel
 from horangi.models import (
     Action,
     CheckHistory,
@@ -139,37 +140,41 @@ def get_aggregated_by_rules(
     #  once for a rule.
     rules: Dict[str, AggregatedByRule] = dict()
     for row in rows:
-        if row.resource_gid:
-            resource = Resource(
-                is_service=False,
-                region=row.resource_region,
-                service=row._params.get('service'),
-                severity=row.severity,
-                gid=row.resource_gid,
-                note=row.note,
-            )
-        else:
-            resource = Resource(
-                is_service=True,
-                region=row._params.get('region'),
-                service=row._params.get('service'),
-                severity=row.severity,
-                note=row.note,
-            )
+        try:
+            if row.resource_gid:
+                resource = Resource(
+                    is_service=False,
+                    region=row.resource_region,
+                    service=row._params.get('service'),
+                    severity=SeverityLevel(row.severity).name,
+                    gid=row.resource_gid,
+                    note=row.note,
+                )
+            else:
+                resource = Resource(
+                    is_service=True,
+                    region=row._params.get('region'),
+                    service=row._params.get('service'),
+                    severity=SeverityLevel(row.severity).name,
+                    note=row.note,
+                )
 
-        # Only compliance tags
-        tags = list(filter(lambda t: t.startswith("compliance:"), row.tags))
-        aggregated = rules.get(row.title)
-        if aggregated is None:
-            aggregated = AggregatedByRule(
-                rule=row.title,
-                default_severity=row.default_severity,
-                resources=[resource],
-                tags=tags,
-            )
-            rules[row.title] = aggregated
-        else:
-            aggregated.resources.append(resource)
+            # Only compliance tags
+            tags = list(filter(lambda t: t.startswith("compliance:"), row.tags))  # noqa
+            aggregated = rules.get(row.title)
+            if aggregated is None:
+                aggregated = AggregatedByRule(
+                    rule=row.title,
+                    default_severity=row.default_severity,
+                    resources=[resource],
+                    tags=tags,
+                )
+                rules[row.title] = aggregated
+            else:
+                aggregated.resources.append(resource)
+        except Exception:
+            logger.exception("Fail to fetch a row")
+            # ignored
 
     return list(rules.values())
 
