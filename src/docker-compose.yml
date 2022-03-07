@@ -1,0 +1,12 @@
+version: '2.1'
+
+services:
+
+  database-horangi:
+    extends:
+      file: tgr-backend-common/docker-compose.yml
+      service: database-horangi
+
+networks:
+  default:
+    name: tgr-horangi-platform
