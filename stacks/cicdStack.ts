@@ -54,6 +54,7 @@ export default class CicdStack extends sst.Stack {
         resources: [`arn:aws:iam::${scope.account}:role/cdk-hnb659fds-*`],
       }),
     ];
+    process.env.ENVIRONMENT_MODE = config.stageProps.environmentMode
     const synth = new CodeBuildStep("Build", {
       projectName: `${prefix}-build`,
       input,
