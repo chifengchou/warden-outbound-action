@@ -77,7 +77,7 @@ const cicdConfigurations: Readonly<Record<string, Config>> = {
       githubRepo: "tgr-warden-outbound",
       gitBranch: "release/candidate",
       githubConnectionArn: "arn:aws:codestar-connections:ap-southeast-1:886561456280:connection/5e2e25c3-a871-4b1c-8c78-fe9ae15d43f3",
-      githubSecretName: "tgr-dev-1-platform-github-ssh",
+      githubSecretName: "tgr-stage-1-platform-github-ssh",
     }
   ),
   prod: new Config({
@@ -92,7 +92,7 @@ const cicdConfigurations: Readonly<Record<string, Config>> = {
       githubRepo: "tgr-warden-outbound",
       gitBranch: "master",
       githubConnectionArn: "arn:aws:codestar-connections:ap-southeast-1:396286753434:connection/375400a4-9f44-495d-aade-35e55f1a3054",
-      githubSecretName: "tgr-dev-1-platform-github-ssh",
+      githubSecretName: "tgr-prod-0-platform-github-ssh",
     }
   )
 }
