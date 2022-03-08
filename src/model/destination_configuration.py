@@ -18,7 +18,7 @@ class DestinationConfiguration(BaseModel):
     destination_uid: str
     is_enabled: bool = True
     # NOTE: filters for now only supports severities, e.g.
-    #  `"severities": [ "low", "high" ]`
+    #  `"severities": [ 4, 3 ]`
     filters: Optional[Dict[str, Any]] = Field(default_factory=dict)
 
     @validator("filters")
@@ -26,5 +26,5 @@ class DestinationConfiguration(BaseModel):
         for k, v_ in v.items():
             if k == "severities":
                 for s in v_:
-                    SeverityLevel.from_str(s)
+                    SeverityLevel(s)
         return v

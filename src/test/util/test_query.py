@@ -44,6 +44,7 @@ class TestQuery:
         )
         # DestinationConfiguration: first 2 are slask, last 2 are aws_sns,
         dcs = [
+            # for slack
             DestinationConfiguration(
                 destination_uid=cls.destinations[0].uid,
             ),
@@ -51,8 +52,10 @@ class TestQuery:
                 destination_uid=cls.destinations[1].uid,
                 is_enabled=False,
             ),
+            # for sns
             DestinationConfiguration(
                 destination_uid=cls.destinations[2].uid,
+                filters={"severities": [0, 1, 2, 3, 4]},
             ),
             DestinationConfiguration(
                 destination_uid=cls.destinations[3].uid,
