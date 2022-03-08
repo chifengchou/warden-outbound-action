@@ -72,7 +72,9 @@ export default class CicdStack extends sst.Stack {
         'eval "$(ssh-agent -s)" && ssh-add /root/.ssh/temp_rsa',
         "git submodule update --init --recursive",
         // Testing
-        // Building
+        "chmod +x ./src/scripts/run_test.sh",
+        "./src/scripts/run_test.sh",
+        // Install
         "npm install",
       ],
       commands: [

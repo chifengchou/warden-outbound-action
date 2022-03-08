@@ -9,23 +9,26 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v4.1.0
     hooks:
-    - id: check-yaml
     - id: end-of-file-fixer
-    - id: trailing-whitespace
     - id: check-merge-conflict
     - id: check-json
+      exclude: ^data/.*$
+    - id: check-yaml
     - id: debug-statements
     - id: end-of-file-fixer
+      exclude: ^docs/.*$
     - id: pretty-format-json
       args:
       - --autofix
+      exclude: ^data/.*$
+    - id: trailing-whitespace
 
   - repo: https://github.com/psf/black
     rev: 22.1.0
     hooks:
     - id: black
       language_version: python3
-      args: ["-S"]
+      args: ['-S', '--line-length=79']
     # hooks to fix outdated syntaxes
   - repo: https://github.com/asottile/pyupgrade
     rev: v2.31.0
@@ -46,5 +49,5 @@ repos:
     rev: 4.0.1
     hooks:
     - id: flake8
-      exclude: ^lib/.*$|^tests/.*$
-      language_version: python3
+      # args: ['--ignore=E501']
+      args: ['--max-line-length=120', '--ignore=E203,W503']

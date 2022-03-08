@@ -5,7 +5,7 @@ description = ""
 authors = ["chifengchou <chifeng@horangi.com>"]
 
 [tool.poetry.dependencies]
-python = "3.8"
+python = "~=3.8.0"
 tgr-backend-common = {path = "./tgr-backend-common"}
 pydantic = "^1.8.2"
 aws-lambda-powertools = {extras = ["pydantic"], version = "^1.25.1"}

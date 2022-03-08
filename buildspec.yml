@@ -1,0 +1,23 @@
+# This is for CodeBuild to run tests for every commit.
+# https://github.com/horangi-ir/tgr-devops/pull/664
+version: 0.2
+
+phases:
+  install:
+    commands:
+      - echo "Entering 'install' phase..."
+
+  pre_build:
+    commands:
+      - mkdir -p /root/.ssh/
+      - touch /root/.ssh/known_hosts
+      - ssh-keyscan github.com >> /root/.ssh/known_hosts
+      - aws secretsmanager get-secret-value --secret-id tgr-dev-1-platform-github-ssh | jq -r ".SecretString" > /root/.ssh/temp_rsa
+      - chmod 400 /root/.ssh/temp_rsa
+      - eval "$(ssh-agent -s)" && ssh-add /root/.ssh/temp_rsa
+      - git submodule update --init --recursive
+
+  build:
+    commands:
+      - chmod +x ./src/scripts/run_test.sh
+      - ./src/scripts/run_test.sh
