@@ -1,53 +1,53 @@
 files: ^src/.*\.py
 repos:
-  - repo: https://github.com/commitizen-tools/commitizen
-    rev: v2.20.4
-    hooks:
-      - id: commitizen
-        stages: [commit-msg]
-
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.1.0
-    hooks:
-    - id: end-of-file-fixer
-    - id: check-merge-conflict
-    - id: check-json
-      exclude: ^data/.*$
-    - id: check-yaml
-    - id: debug-statements
-    - id: end-of-file-fixer
-      exclude: ^docs/.*$
-    - id: pretty-format-json
-      args:
-      - --autofix
-      exclude: ^data/.*$
-    - id: trailing-whitespace
-
-  - repo: https://github.com/psf/black
-    rev: 22.1.0
-    hooks:
-    - id: black
-      language_version: python3
-      args: ['-S', '--line-length=79']
-    # hooks to fix outdated syntaxes
-  - repo: https://github.com/asottile/pyupgrade
-    rev: v2.31.0
-    hooks:
-    -   id: pyupgrade
-        args:
-        - --py38-plus
-
-    # hooks to autosort imports
-  - repo: https://github.com/pycqa/isort
-    rev: 5.10.1
-    hooks:
-      - id: isort
-        args: ["--profile", "black", "--filter-files"]
-
-    # hooks to run flake8, run this last
-  - repo: https://github.com/PyCQA/flake8
-    rev: 4.0.1
-    hooks:
-    - id: flake8
-      # args: ['--ignore=E501']
-      args: ['--max-line-length=120', '--ignore=E203,W503']
+- hooks:
+  - id: commitizen
+    stages:
+    - commit-msg
+  repo: https://github.com/commitizen-tools/commitizen
+  rev: v2.20.4
+- hooks:
+  - id: end-of-file-fixer
+  - id: check-merge-conflict
+  - exclude: ^data/.*$
+    id: check-json
+  - id: check-yaml
+  - id: debug-statements
+  - exclude: ^docs/.*$
+    id: end-of-file-fixer
+  - args:
+    - --autofix
+    exclude: ^data/.*$
+    id: pretty-format-json
+  - id: trailing-whitespace
+  repo: https://github.com/pre-commit/pre-commit-hooks
+  rev: v4.1.0
+- hooks:
+  - args:
+    - -S
+    - --line-length=79
+    id: black
+    language_version: python3
+  repo: https://github.com/psf/black
+  rev: 22.1.0
+- hooks:
+  - args:
+    - --py38-plus
+    id: pyupgrade
+  repo: https://github.com/asottile/pyupgrade
+  rev: v2.31.0
+- hooks:
+  - args:
+    - --profile
+    - black
+    - --filter-files
+    id: isort
+  repo: https://github.com/pycqa/isort
+  rev: 5.10.1
+- hooks:
+  - args:
+    - --max-line-length=120
+    - --ignore=E203,W503
+    id: flake8
+  repo: https://github.com/PyCQA/flake8
+  rev: 4.0.1
