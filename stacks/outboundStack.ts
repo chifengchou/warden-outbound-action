@@ -53,6 +53,10 @@ export default class OutboundStack extends sst.Stack {
     //  Specifying scope to be a union type is a workaround. Note that we can not call utilities like
     //  `sst.App.setDefaultFunctionProps` without checking scope's type..
     super(scope, id, props);
+    console.log("===========================================================================")
+    console.log(`tags=${props?.tags}`)
+    console.log(`ENVIRONMENT_MODE=${process.env.ENVIRONMENT_MODE}`)
+    console.log("===========================================================================")
 
     const cicdStages = Config.getCicdStageNames()
     let stage: string;

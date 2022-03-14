@@ -54,7 +54,7 @@ export default class CicdStack extends sst.Stack {
         resources: [`arn:aws:iam::${scope.account}:role/cdk-hnb659fds-*`],
       }),
     ];
-    process.env.ENVIRONMENT_MODE = config.stageProps.environmentMode
+    //process.env.ENVIRONMENT_MODE = config.stageProps.environmentMode
     const synth = new CodeBuildStep("Build", {
       projectName: `${prefix}-build`,
       input,
@@ -89,18 +89,23 @@ export default class CicdStack extends sst.Stack {
       dockerEnabledForSynth: true,
       crossAccountKeys: false,
     });
-    pipeline.addStage(new OutboundStage(this, "Stage"));
+    console.log("===========================================================================")
+    console.log("addStage")
+    console.log("===========================================================================")
+    // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
+    pipeline.addStage(new OutboundStage(this, "Stage", props!.tags!));
   }
 }
 
 
 class OutboundStage extends Stage {
-  constructor(scope: sst.Stack, id: string, props?: StageProps) {
+  constructor(scope: sst.Stack, id: string, tags: Record<string, string>, props?: StageProps) {
     super(scope, id, props);
     // FIXME: We pass in a Stage(`this`) where sst.App is required. This is a workaround because the lack of support of
     //  using sst.App in CodePipeline. See the implementation of OutboundStack.
     new OutboundStack(this, "Stack", {
-      stackName: `${scope.stage}-tgr-warden-outbound-stack`
+      stackName: `${scope.stage}-tgr-warden-outbound-stack`,
+      tags: tags,
     });
   }
 }

@@ -60,7 +60,7 @@ const cicdConfigurations: Readonly<Record<string, Config>> = {
   }, {
       githubOwner: "horangi-ir",
       githubRepo: "tgr-warden-outbound",
-      gitBranch: "develop",
+      gitBranch: "feat/add_tags",
       githubConnectionArn: "arn:aws:codestar-connections:ap-southeast-1:410801124909:connection/a6f85a35-6448-48ba-ad25-46bc9bb8caeb",
       githubSecretName: "tgr-dev-1-platform-github-ssh",
     }
