@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
@@ -37,7 +37,7 @@ from horangi.signals.message_storyfier import IndexCompleteV1
 from horangi.signals.message_util import register
 
 from constant import LOG_LEVEL, OUTBOUND_EVENT_BUS_NAME, SQL_ECHO
-from model.sns_summary import Resource, Rule, SnsSummaryInputV1, SnsSummaryV1
+from model.sns_summary import Entity, Rule, SnsSummaryInputV1, SnsSummaryV1
 from util.middleware import middleware_db_connect
 from util.query import query_enabled_destinations
 
@@ -71,10 +71,23 @@ processor = BatchProcessor(event_type=EventType.SQS)
 
 @tracer.capture_method(capture_response=False)
 def query_rules(
-    org_uid,
-    task_uid,
+    org_uid: str,
+    task_uid: str,
     filters: Optional[Dict[str, Any]] = None,
 ) -> List[Rule]:
+    """
+    Query `first_seen`, `reappeared` and `pass_to_fail` checks from the given
+    task. Aggregate them to be a list of Rules.
+    Args:
+        org_uid (str):
+        task_uid (str):
+        filters (Optional[Dict[str, Any]]): a dictionary of filters. ATM, only
+            'severities'(List[int]) is supported
+
+    Returns:
+        A list of Rule
+
+    """
     if filters and filters.get("severities"):
         severities = filters.get('severities')
     else:
@@ -142,7 +155,7 @@ def query_rules(
     for row in rows:
         try:
             if row.resource_gid:
-                resource = Resource(
+                resource = Entity(
                     is_service=False,
                     region=row.resource_region,
                     service=row._params.get('service'),
@@ -151,7 +164,7 @@ def query_rules(
                     note=row.note,
                 )
             else:
-                resource = Resource(
+                resource = Entity(
                     is_service=True,
                     region=row._params.get('region'),
                     service=row._params.get('service'),
@@ -181,16 +194,25 @@ def query_rules(
     return list(rules.values())
 
 
-@tracer.capture_method(capture_response=False)
-def create_summary_for_sns(m: Message[IndexCompleteV1], **_) -> None:
-    task_uid = m.content.task_uid
+def transform_message(
+    message: Message[IndexCompleteV1],
+) -> Iterable[Message[SnsSummaryInputV1]]:
+    """
+    Transform the incoming `Message[IndexCompleteV1]` to one or more
+    `Message[SnsSummaryInputV1]`
+    Args:
+        message (Message[IndexCompleteV1]):
+
+    Returns:
+        A generator of Message[SnsSummaryInputV1]
+    """
+    task_uid = message.content.task_uid
     logger.debug(f"create_summary_for_sns for {task_uid=}")
-    action: Action = session.query(Action).get(m.content.action_uid)
+    action: Action = session.query(Action).get(message.content.action_uid)
     if action.action_type != ActionType.cloud_scan.value:
         logger.info(f"Only {ActionType.cloud_scan} is supported")
         return
 
-    entries = []
     # NOTE: For now all destinations share the same "filters". Therefore, we
     #  only query aggregated once.
     aggregated: Optional[List[Rule]] = None
@@ -216,22 +238,42 @@ def create_summary_for_sns(m: Message[IndexCompleteV1], **_) -> None:
                 msg_type="SnsSummaryInput",
                 version="1",
                 content=content,
-                # Route to sender
+                # Will be routed to sender by the event bus
                 msg_attrs={"route": "ready_to_send"},
             )
-            logger.debug(msg)
+            yield msg
+        except:  # noqa
+            logger.exception(
+                f"Failed to create summary for {destination.uid}. Continue"
+            )
+            # ignore
+
+
+@tracer.capture_method(capture_response=False)
+def create_sns_summary(message: Message[IndexCompleteV1], **_) -> None:
+    """
+    Transform incoming `Message[IndexCompleteV1]` to one or more
+    `Message[SnsSummaryInputV1]`, then send them to the event bus.
+    Args:
+        message (Message[IndexCompleteV1]): message to transform.
+        **_ (): dummy placeholder for any kwargs may be passed in.
+
+    Returns:
+        None
+    """
+    entries = []
+    for m in transform_message(message):
+        try:
             entries.append(
                 {
                     'EventBusName': OUTBOUND_EVENT_BUS_NAME,
                     'Source': POWERTOOLS_SERVICE_NAME,
                     'DetailType': "OutboundNotification",
-                    'Detail': msg.json(),
+                    'Detail': m.json(),
                 }
             )
-        except Exception:
-            logger.exception(
-                f"Failed to create summary for {destination.uid}. Continue"
-            )
+        except:  # noqa
+            logger.exception("Fail to add a entry")
             # ignore
 
     logger.info(f"Send {len(entries)} events")
@@ -241,11 +283,11 @@ def create_summary_for_sns(m: Message[IndexCompleteV1], **_) -> None:
         logger.info(resp)
 
 
-register(msg_cls=Message[IndexCompleteV1], receiver=create_summary_for_sns)
+register(msg_cls=Message[IndexCompleteV1], receiver=create_sns_summary)
 
 
 @tracer.capture_method(capture_response=False)
-def record_handler(record: SQSRecord):
+def record_handler(record: SQSRecord) -> None:
     # TODO: handler should be in a nested db transaction
     logger.info(record.raw_event)
     obj = json.loads(record.body)
@@ -256,6 +298,7 @@ def record_handler(record: SQSRecord):
         s.send(detail)
     else:
         logger.info(f"No receiver for {msg_type_id=}")
+    return
 
 
 @metrics.log_metrics(capture_cold_start_metric=True)

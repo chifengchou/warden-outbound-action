@@ -15,7 +15,15 @@ def query_enabled_destinations(
     action_group: ActionGroup, destination_type: DestinationType
 ) -> Iterable[Tuple[DestinationConfiguration, Destination]]:
     """
-    A generator yields Tuple[DestinationConfig, Destination]
+    A generator yield Tuple[DestinationConfig, Destination] of given
+    ActionGroup and DestinationType.
+
+    Args:
+        action_group (ActionGroup):
+        destination_type (DestinationType):
+
+    Returns:
+        A generator of Tuple[DestinationConfiguration, Destination]
     """
     destination_configurations = action_group.destination_configuration
     if not destination_configurations:

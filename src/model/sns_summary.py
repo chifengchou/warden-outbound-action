@@ -4,9 +4,10 @@ from horangi.signals.message import ContentModel
 from pydantic import BaseModel, Field
 
 
-class Resource(BaseModel):
+class Entity(BaseModel):
     """
-    Resource represents both resources and services. The latter is
+    Entity represents either a resource or a service. If it's a service entity,
+    then `gid` is None.
     """
 
     is_service: bool = Field(description="The entity represents a service")
@@ -15,7 +16,7 @@ class Resource(BaseModel):
     severity: str
     # gid is None if is_service
     gid: Optional[str] = Field(
-        None, description="Resource gid. Null if is_service"
+        None, description="Entity gid. Null if is_service"
     )  # noqa
     note: Optional[str]
 
@@ -27,7 +28,7 @@ class Rule(BaseModel):
 
     rule: str
     default_severity: str
-    resources: List[Resource] = Field(default_factory=list)
+    resources: List[Entity] = Field(default_factory=list)
     tags: Optional[List[str]] = Field(
         default_factory=list, description="Compliance tags"
     )
@@ -35,7 +36,7 @@ class Rule(BaseModel):
 
 class SnsSummaryV1(ContentModel, msg_type_id=("SnsSummary", "1")):
     """
-    Model of data sent to SNS topic
+    Model of data sent to SNS topic by SNS topic sender
     """
 
     cloud_provider: str
@@ -46,7 +47,7 @@ class SnsSummaryV1(ContentModel, msg_type_id=("SnsSummary", "1")):
 
 class SnsSummaryInputV1(ContentModel, msg_type_id=("SnsSummaryInput", "1")):
     """
-    Model of data prepared for SNS topic
+    Model of data prepared for SNS topic sender
     """
 
     sns_topic_arn: str

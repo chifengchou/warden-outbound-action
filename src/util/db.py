@@ -11,7 +11,7 @@ logger = Logger(child=True)
 @lru_cache(maxsize=1)
 def get_database_connection_url():
     """Returns the database connection URL, injecting password retrieved
-    via secrets manager if we're running in an lambda environment.
+    via secrets manager if we're running in a lambda environment.
     """
     if IS_AWS:
         secret_key = os.environ.get('DATABASE_PASSWORD_SECRET_KEY')

@@ -15,8 +15,11 @@ logger = Logger(child=True)
 @lambda_handler_decorator
 def middleware_db_connect(handler: Callable, event: Dict, context: Dict):
     """
-    Middleware that resolves db credential and sets up the db engine
-    NOTE: This should come before any db middleware that needs a db session.
+    Middleware that resolves db credential and sets up the db engine. Then
+    wraps handler in a transaction.
+    NOTE:
+        1. This should come before any db middleware that needs a db session.
+        2. the handler is responsible for `session.commit()` itself.
     """
     # Initialize db engine and configure session_factory.
     # Do it here instead of doing globally so that any error can be captured
