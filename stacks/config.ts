@@ -45,7 +45,7 @@ const testStackConfiguration = new Config({
   databaseName: "horangi",
   databaseUserName: "storyfier",
   logLevel: "DEBUG",
-  sentryDsn: "",
+  sentryDsn: "https://d6d5ff049d44407eb6b81a9d87c50683@o252460.ingest.sentry.io/6257979",
 });
 
 // Config used when `sst {action} --stage {cicd pipeline stage name}`
@@ -56,7 +56,7 @@ const cicdConfigurations: Readonly<Record<string, Config>> = {
       databaseName: "horangi",
       databaseUserName: "storyfier",
       logLevel: "DEBUG",
-      sentryDsn: "",
+      sentryDsn: "https://d6d5ff049d44407eb6b81a9d87c50683@o252460.ingest.sentry.io/6257979",
   }, {
       githubOwner: "horangi-ir",
       githubRepo: "tgr-warden-outbound",
@@ -71,7 +71,7 @@ const cicdConfigurations: Readonly<Record<string, Config>> = {
       databaseName: "horangi",
       databaseUserName: "storyfier",
       logLevel: "DEBUG",
-      sentryDsn: "",
+      sentryDsn: "https://d6d5ff049d44407eb6b81a9d87c50683@o252460.ingest.sentry.io/6257979",
     }, {
       githubOwner: "horangi-ir",
       githubRepo: "tgr-warden-outbound",
@@ -86,7 +86,7 @@ const cicdConfigurations: Readonly<Record<string, Config>> = {
       databaseName: "horangi",
       databaseUserName: "storyfier",
       logLevel: "DEBUG",
-      sentryDsn: "",
+      sentryDsn: "https://d6d5ff049d44407eb6b81a9d87c50683@o252460.ingest.sentry.io/6257979",
     }, {
       githubOwner: "horangi-ir",
       githubRepo: "tgr-warden-outbound",

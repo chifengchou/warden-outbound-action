@@ -50,5 +50,7 @@ class SnsSummaryInputV1(ContentModel, msg_type_id=("SnsSummaryInput", "1")):
     Model of data prepared for SNS topic sender
     """
 
+    org_uid: str
+    task_uid: str
     sns_topic_arn: str
     summary: SnsSummaryV1

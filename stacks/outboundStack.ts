@@ -1,5 +1,5 @@
 import * as sst from "@serverless-stack/resources";
-import {Stage, Fn, aws_iam as iam, aws_lambda as lambda, aws_ec2 as ec2 } from "aws-cdk-lib";
+import {Stage, Fn, aws_iam as iam, aws_lambda as lambda, aws_ec2 as ec2, Duration} from "aws-cdk-lib";
 import fs_extra from "fs-extra";
 import glob from "glob";
 import {Config} from "./config";
@@ -118,6 +118,7 @@ export default class OutboundStack extends sst.Stack {
             Fn.importValue(`${config.networkLayerStackName}-subnet-app-c-id`)),
         ]
       },
+      timeout: Duration.seconds(20),
     }
     const environment = {
       SENTRY_DSN: config.stageProps.sentryDsn,
