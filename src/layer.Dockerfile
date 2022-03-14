@@ -20,4 +20,5 @@ COPY tgr-backend-common ./tgr-backend-common
 
 # Run these command separately
 RUN if [ -f 'poetry.lock' ]; then poetry export --with-credentials --without-hashes --format requirements.txt --output requirements.txt; else echo "poetry.lock not found"; fi
-RUN mkdir -p /var/dependency/python && pip install -r requirements.txt -t /var/dependency/python
+RUN mkdir -p /var/dependency/python && pip install -r requirements.txt -t /var/dependency/python && \
+    rm -rf /var/dependency/python/botocore* && rm -rf /var/dependency/python/boto3*
