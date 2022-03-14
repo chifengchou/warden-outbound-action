@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics, Tracer
@@ -70,10 +70,10 @@ processor = BatchProcessor(event_type=EventType.SQS)
 
 
 @tracer.capture_method(capture_response=False)
-def get_aggregated_by_rules(
+def query_rules(
     org_uid,
     task_uid,
-    filters,
+    filters: Optional[Dict[str, Any]] = None,
 ) -> List[Rule]:
     if filters and filters.get("severities"):
         severities = filters.get('severities')
@@ -160,12 +160,14 @@ def get_aggregated_by_rules(
                 )
 
             # Only compliance tags
-            tags = list(filter(lambda t: t.startswith("compliance:"), row.tags))  # noqa
+            tags = list(
+                filter(lambda t: t.startswith("compliance:"), row.tags)
+            )  # noqa
             aggregated = rules.get(row.title)
             if aggregated is None:
                 aggregated = Rule(
                     rule=row.title,
-                    default_severity=row.default_severity,
+                    default_severity=SeverityLevel(row.default_severity).name,
                     resources=[resource],
                     tags=tags,
                 )
@@ -198,7 +200,7 @@ def create_summary_for_sns(m: Message[IndexCompleteV1], **_) -> None:
         try:
             logger.debug(f"Process {destination.uid=}")
             if aggregated is None:
-                aggregated = get_aggregated_by_rules(
+                aggregated = query_rules(
                     action.org_uid, task_uid, config.filters
                 )
             content = SnsSummaryInputV1(
