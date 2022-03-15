@@ -317,6 +317,7 @@ def record_handler(record: SQSRecord) -> None:
     return
 
 
+@logger.inject_lambda_context()
 @metrics.log_metrics(capture_cold_start_metric=True)
 @tracer.capture_lambda_handler(capture_response=False)
 @middleware_db_connect  # should come before batch_processor
