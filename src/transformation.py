@@ -62,6 +62,8 @@ if sentry_dsn:
         environment=ENVIRONMENT_MODE,
     )
 
+MAX_RECEIVE_COUNT = int(os.environ.get("MAX_RECEIVE_COUNT", "3"))
+
 logger = Logger(level=logging.getLevelName(LOG_LEVEL))
 logger.info(
     f"{POWERTOOLS_METRICS_NAMESPACE=}, {POWERTOOLS_SERVICE_NAME=}, {IS_AWS=}, "
@@ -304,16 +306,29 @@ register(msg_cls=Message[IndexCompleteV1], receiver=create_sns_summary)
 
 @tracer.capture_method(capture_response=False)
 def record_handler(record: SQSRecord) -> None:
-    # TODO: handler should be in a nested db transaction
-    logger.debug("record_handler start")
-    obj = json.loads(record.body)
-    detail = obj["detail"]
-    msg_type_id = Message.parse_msg_type_id(detail)
-    s = signal(msg_type_id)
-    if s.receivers:
-        s.send(detail)
-    else:
-        logger.info(f"No receiver for {msg_type_id=}")
+    try:
+        # TODO: handler should be in a nested db transaction
+        logger.debug("record_handler start")
+        obj = json.loads(record.body)
+        detail = obj["detail"]
+        msg_type_id = Message.parse_msg_type_id(detail)
+        s = signal(msg_type_id)
+        if s.receivers:
+            s.send(detail)
+        else:
+            logger.info(f"No receiver for {msg_type_id=}")
+    except:  # noqa
+        if (
+            int(record.attributes.approximate_receive_count)
+            >= MAX_RECEIVE_COUNT
+        ):  # noqa
+            # Remove the message from the queue if retried too many times
+            logger.exception(
+                f"Tried {MAX_RECEIVE_COUNT} times, give up the message"
+            )
+            # ignore
+            return
+        raise
     return
 
 

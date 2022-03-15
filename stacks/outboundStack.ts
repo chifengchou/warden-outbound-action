@@ -133,12 +133,16 @@ export default class OutboundStack extends sst.Stack {
       LOG_LEVEL: config.stageProps.logLevel,
       OUTBOUND_EVENT_BUS_ARN: bus.eventBusArn,
       OUTBOUND_EVENT_BUS_NAME: bus.eventBusName,
+      MAX_RECEIVE_COUNT: "5",
       // https://awslabs.github.io/aws-lambda-powertools-python/
       POWERTOOLS_METRICS_NAMESPACE: "outbound",
       POWERTOOLS_LOGGER_LOG_EVENT: `${config.stageProps.environmentMode !== "prod"}`,
     }
 
     const transQueue = new sst.Queue(this, "TransQueue", {
+      sqsQueue: {
+        visibilityTimeout: Duration.seconds(60),
+      },
       consumer: {
         function: {
           functionName: `${prefix}-transformation`,
@@ -173,6 +177,9 @@ export default class OutboundStack extends sst.Stack {
     ])
 
     const senderQueue = new sst.Queue(this, "SenderQueue", {
+      sqsQueue: {
+        visibilityTimeout: Duration.seconds(60),
+      },
       consumer: {
         function: {
           functionName: `${prefix}-sender`,
