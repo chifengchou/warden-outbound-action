@@ -1,6 +1,7 @@
 import json
 import logging
 import os
+import re
 
 import boto3
 import sentry_sdk
@@ -62,13 +63,16 @@ processor = BatchProcessor(event_type=EventType.SQS)
 @tracer.capture_method(capture_response=False)
 def send_sns_summary(message: Message[SnsSummaryInputV1], **_) -> None:
     topic_arn = message.content.sns_topic_arn
+    m = re.match(r"^arn:aws:sns:([\w-]+):.+$", topic_arn)
+    # e.g. m.groups() == ('us-east-1',)
+    region = m.group(1)
     logger.info(
         f'send_sns_summary for org_uid={message.content.org_uid}, task_uid='
-        f'{message.content.task_uid}, {topic_arn=}'
+        f'{message.content.task_uid}, {topic_arn=}, {region=}'
     )
+    client = boto3.client("sns", region_name=region)
 
     summary = message.content.summary.json()
-    client = boto3.client("sns")
     resp = client.publish(
         Message=summary,
         TopicArn=topic_arn,
