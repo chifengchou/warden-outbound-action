@@ -228,7 +228,7 @@ def transform_message(
     #  only query aggregated once.
     aggregated: Optional[List[Rule]] = None
     for config, destination in query_enabled_destinations(
-        action.action_group, DestinationType.aws_sns
+        action.action_group, [DestinationType.aws_sns]
     ):  # noqa
         try:
             logger.debug(f"Process {destination.uid=}")
