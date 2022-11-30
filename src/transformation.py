@@ -39,7 +39,12 @@ from horangi.signals.message_util import register
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 
 from constant import LOG_LEVEL, OUTBOUND_EVENT_BUS_NAME, SQL_ECHO
-from model.sns_summary import Entity, Rule, SnsSummaryInputV1, SnsSummaryV1
+from model import (
+    Entity, 
+    Rule, 
+    SnsSummaryInputV1, 
+    SnsSummaryV1,
+)
 from util.middleware import middleware_db_connect
 from util.query import query_enabled_destinations
 

@@ -20,7 +20,7 @@ from horangi.signals.message_util import register
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 
 from constant import LOG_LEVEL, SQL_ECHO
-from model.sns_summary import SnsSummaryInputV1
+from model import PubSubSummaryInputV1, SnsSummaryInputV1
 from util.middleware import middleware_db_connect
 
 POWERTOOLS_METRICS_NAMESPACE = os.environ.get(
