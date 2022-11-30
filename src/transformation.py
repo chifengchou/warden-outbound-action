@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Union
 
 import boto3
 import sentry_sdk
@@ -24,6 +24,7 @@ from horangi.constants import (
 from horangi.generated.severity_level import SeverityLevel
 from horangi.models import (
     Action,
+    ActionGroup,
     CheckHistory,
     FindingsDefinition,
     ScanFindingsDefinitionMapping,
@@ -40,9 +41,11 @@ from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 
 from constant import LOG_LEVEL, OUTBOUND_EVENT_BUS_NAME, SQL_ECHO
 from model import (
-    Entity, 
-    Rule, 
-    SnsSummaryInputV1, 
+    Entity,
+    PubSubSummaryInputV1,
+    PubSubSummaryV1,
+    Rule,
+    SnsSummaryInputV1,
     SnsSummaryV1,
 )
 from util.middleware import middleware_db_connect
@@ -212,10 +215,10 @@ def query_rules(
 
 def transform_message(
     message: Message[IndexCompleteV1],
-) -> Iterable[Message[SnsSummaryInputV1]]:
+) -> Iterable[Message[Union[SnsSummaryInputV1, PubSubSummaryInputV1]]]:
     """
     Transform the incoming `Message[IndexCompleteV1]` to one or more
-    `Message[SnsSummaryInputV1]`
+    `Message[SnsSummaryInputV1]` or `Message[PubSubSummaryInputV1]`
     Args:
         message (Message[IndexCompleteV1]):
 
@@ -233,34 +236,55 @@ def transform_message(
     #  only query aggregated once.
     aggregated: Optional[List[Rule]] = None
     for config, destination in query_enabled_destinations(
-        action.action_group, [DestinationType.aws_sns]
+        action.action_group, [DestinationType.aws_sns, DestinationType.pubsub]
     ):  # noqa
         try:
             logger.debug(f"Process {destination.uid=}")
             if aggregated is None:
-                aggregated = query_rules(
-                    action.org_uid, task_uid, config.filters
+                aggregated = query_rules(action.org_uid, task_uid, config.filters)
+            if destination.destination_type == DestinationType.aws_sns.value:
+                # data_model = SnsSummaryV1
+                content = SnsSummaryInputV1(
+                    org_uid=message.content.org_uid,
+                    task_uid=task_uid,
+                    sns_topic_arn=destination.sns_topic_arn,
+                    summary=SnsSummaryV1(
+                        cloud_provider=action.cloud_provider_type,
+                        scan_group=action.action_group.name,
+                        target_name=action.target_name,
+                        rules=aggregated,
+                    ),
                 )
-            content = SnsSummaryInputV1(
-                org_uid=message.content.org_uid,
-                task_uid=task_uid,
-                sns_topic_arn=destination.sns_topic_arn,
-                summary=SnsSummaryV1(
-                    cloud_provider=action.cloud_provider_type,
-                    scan_group=action.action_group.name,
-                    target_name=action.target_name,
-                    rules=aggregated,
-                ),
-            )
-            msg = Message[SnsSummaryInputV1](
-                msg_type="SnsSummaryInput",
-                version="1",
+            elif destination.destination_type == DestinationType.pubsub.value:
+                content = PubSubSummaryInputV1(
+                    org_uid=message.content.org_uid,
+                    task_uid=task_uid,
+                    pubsub_topic_id=destination.topic_id,
+                    project_id=destination.project_id,
+                    encrypted_credentials=destination.meta["credentials"],
+                    summary=PubSubSummaryV1(
+                        cloud_provider=action.cloud_provider_type,
+                        scan_group=action.action_group.name,
+                        target_name=action.target_name,
+                        rules=aggregated,
+                    ),
+                )
+            else:
+                raise ValueError(
+                    f"Unsupported destination_type {destination.destination_type}"
+                )
+            # allow Nonetype error to raise
+            message_type, version = content.get_msg_type_id()  # type: ignore
+
+            msg = Message[content.__class__](
+                msg_type=message_type,
+                version=version,
                 content=content,
                 # Will be routed to sender by the event bus
                 msg_attrs={"route": "ready_to_send"},
             )
             yield msg
-        except:  # noqa
+        except Exception:  # noqa
             logger.exception(
                 f"Failed to create summary for {destination.uid}. Continue"
             )
@@ -268,10 +292,10 @@ def transform_message(
 
 
 @tracer.capture_method(capture_response=False)
-def create_sns_summary(message: Message[IndexCompleteV1], **_) -> None:
+def create_summary(message: Message[IndexCompleteV1], **_) -> None:
     """
     Transform incoming `Message[IndexCompleteV1]` to one or more
-    `Message[SnsSummaryInputV1]`, then send them to the event bus.
+    `Message`, then send them to the event bus.
     Args:
         message (Message[IndexCompleteV1]): message to transform.
         **_ (): dummy placeholder for any kwargs may be passed in.
@@ -280,7 +304,7 @@ def create_sns_summary(message: Message[IndexCompleteV1], **_) -> None:
         None
     """
     logger.info(
-        f'create_sns_summary for org_uid={message.content.org_uid}, task_uid='
+        f'create_summary for org_uid={message.content.org_uid}, task_uid='
         f'{message.content.task_uid}'
     )
 
@@ -306,7 +330,7 @@ def create_sns_summary(message: Message[IndexCompleteV1], **_) -> None:
         logger.info(resp)
 
 
-register(msg_cls=Message[IndexCompleteV1], receiver=create_sns_summary)
+register(msg_cls=Message[IndexCompleteV1], receiver=create_summary)
 
 
 @tracer.capture_method(capture_response=False)
