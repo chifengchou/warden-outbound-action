@@ -73,7 +73,7 @@ class TestQuery:
     def test_query_enabled_destinations(self):
         result = list(
             query_enabled_destinations(
-                TestQuery.action_group, DestinationType.aws_sns
+                TestQuery.action_group, [DestinationType.aws_sns]
             )
         )
         assert len(result) == 1

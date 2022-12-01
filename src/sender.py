@@ -20,8 +20,9 @@ from horangi.signals.message_util import register
 from sentry_sdk.integrations.aws_lambda import AwsLambdaIntegration
 
 from constant import LOG_LEVEL, SQL_ECHO
-from model.sns_summary import SnsSummaryInputV1
+from model import PubSubSummaryInputV1, SnsSummaryInputV1
 from util.middleware import middleware_db_connect
+from util.pubsub import send_pubsub_message
 
 POWERTOOLS_METRICS_NAMESPACE = os.environ.get(
     "POWERTOOLS_METRICS_NAMESPACE", "outbound"
@@ -80,7 +81,20 @@ def send_sns_summary(message: Message[SnsSummaryInputV1], **_) -> None:
     logger.info(resp)
 
 
+@tracer.capture_method(capture_response=False)
+def send_pubsub_summary(message: Message[PubSubSummaryInputV1], **_) -> None:
+    topic_id = message.content.topic_id
+
+    logger.info(
+        f'send_pubsub_summary for org_uid={message.content.org_uid}, task_uid='
+        f'{message.content.task_uid}, {topic_id=}'
+    )
+
+    send_pubsub_message(message)
+
+
 register(msg_cls=Message[SnsSummaryInputV1], receiver=send_sns_summary)
+register(msg_cls=Message[PubSubSummaryInputV1], receiver=send_pubsub_summary)
 
 
 @tracer.capture_method(capture_response=False)
@@ -98,13 +112,10 @@ def record_handler(record: SQSRecord) -> None:
             logger.info(f"No receiver for {msg_type_id=}")
     except:  # noqa
         if (
-            int(record.attributes.approximate_receive_count)
-            >= MAX_RECEIVE_COUNT
+            int(record.attributes.approximate_receive_count) >= MAX_RECEIVE_COUNT
         ):  # noqa
             # Remove the message from the queue if retried too many times
-            logger.exception(
-                f"Tried {MAX_RECEIVE_COUNT} times, give up the message"
-            )
+            logger.exception(f"Tried {MAX_RECEIVE_COUNT} times, give up the message")
             # ignore
             return
         raise

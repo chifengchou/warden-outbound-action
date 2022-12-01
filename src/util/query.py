@@ -1,4 +1,4 @@
-from typing import Iterable, Tuple
+from typing import Iterable, Tuple, List
 
 from aws_lambda_powertools import Logger
 from horangi.generated.destination_type import DestinationType
@@ -12,19 +12,20 @@ logger = Logger(child=True)
 
 
 def query_enabled_destinations(
-    action_group: ActionGroup, destination_type: DestinationType
+    action_group: ActionGroup, destination_types: List[DestinationType] = []
 ) -> Iterable[Tuple[DestinationConfiguration, Destination]]:
     """
-    A generator yield Tuple[DestinationConfig, Destination] of given
+    A generator that yields Tuple[DestinationConfig, Destination] of given
     ActionGroup and DestinationType.
 
     Args:
-        action_group (ActionGroup):
-        destination_type (DestinationType):
+        action_group (ActionGroup): Action group with Destinations configured
+        destination_types (List[DestinationType], optional): Defaults to [].
 
     Returns:
-        A generator of Tuple[DestinationConfiguration, Destination]
+        Iterable[Tuple[DestinationConfiguration, Destination]]
     """
+
     destination_configurations = action_group.destination_configuration
     if not destination_configurations:
         logger.info(
@@ -40,14 +41,16 @@ def query_enabled_destinations(
                 logger.info(f"{destination_uid=} is disabled")
                 continue
             logger.info(f"Processing {destination_uid=} ")
-            destination = (
+            query = (
                 session.query(Destination)
-                .filter(
-                    Destination.uid == destination_uid,
-                    Destination.destination_type == destination_type.value,
-                )
-                .one_or_none()
+                .filter(Destination.uid == destination_uid)
             )
+            if destination_types:
+                query = query.filter(
+                    Destination.destination_type.in_([type.value for type in destination_types])
+                )
+            destination = query.one_or_none()
+
             if not destination:
                 logger.warning(f'No destination for {destination_uid=}')
                 continue
