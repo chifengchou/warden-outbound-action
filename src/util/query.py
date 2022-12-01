@@ -47,7 +47,7 @@ def query_enabled_destinations(
             )
             if destination_types:
                 query = query.filter(
-                    Destination.type.in_(destination_types)
+                    Destination.destination_type.in_([type.value for type in destination_types])
                 )
             destination = query.one_or_none()
 
