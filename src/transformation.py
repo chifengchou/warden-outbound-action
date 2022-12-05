@@ -24,7 +24,6 @@ from horangi.constants import (
 from horangi.generated.severity_level import SeverityLevel
 from horangi.models import (
     Action,
-    ActionGroup,
     CheckHistory,
     FindingsDefinition,
     ScanFindingsDefinitionMapping,
@@ -259,7 +258,7 @@ def transform_message(
                 content = PubSubSummaryInputV1(
                     org_uid=message.content.org_uid,
                     task_uid=task_uid,
-                    pubsub_topic_id=destination.topic_id,
+                    topic_id=destination.topic_id,
                     project_id=destination.project_id,
                     encrypted_credentials=destination.meta["credentials"],
                     summary=PubSubSummaryV1(
