@@ -202,15 +202,24 @@ export default class OutboundStack extends sst.Stack {
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     this.add_managed_policy(config, senderFn.role!, "SenderFn")
     // sender handler should be able to publish to the sns.
-    senderFn.attachPermissions([
-      new iam.PolicyStatement({
-        actions: ["sns:publish"],
-        effect: iam.Effect.ALLOW,
-        resources: [
-          "*",
-        ]
-      })
-    ])
+    senderFn.attachPermissions(
+      [
+        new iam.PolicyStatement({
+          actions: ["sns:publish"],
+          effect: iam.Effect.ALLOW,
+          resources: [
+            "*",
+          ]
+        }),
+        new iam.PolicyStatement({
+          actions: ["kms:Decrypt"],
+          effect: iam.Effect.ALLOW,
+          resources: [
+            Fn.importValue(`${config.platformStackName}-kms-cloud-credentials-key`),
+          ]
+        }),
+      ]
+    )
 
     bus.addRules(this, {
       transformationRule: {
