@@ -221,9 +221,9 @@ export default class OutboundStack extends sst.Stack {
       ]
     )
 
-    // Topics created for Docu who is using AliCloud
-    const cspmTopic = new sst.Topic(this, "DocuCspmTopic")
-    const tdTopic = new sst.Topic(this, "DocuTdTopic")
+    // Topics created for Doku who is using AliCloud
+    const cspmTopic = new sst.Topic(this, "DokuCspmTopic")
+    const tdTopic = new sst.Topic(this, "DokuTdTopic")
 
     bus.addRules(this, {
       transformationRule: {
