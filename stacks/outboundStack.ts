@@ -1,5 +1,5 @@
 import * as sst from "@serverless-stack/resources";
-import {Stage, Fn, aws_iam as iam, aws_lambda as lambda, aws_ec2 as ec2, Duration} from "aws-cdk-lib";
+import {Stage, Fn, aws_iam as iam, aws_lambda as lambda, aws_ec2 as ec2, Duration, aws_sqs as sqs, aws_kms as kms} from "aws-cdk-lib";
 import fs_extra from "fs-extra";
 import glob from "glob";
 import {Config} from "./config";
@@ -138,11 +138,14 @@ export default class OutboundStack extends sst.Stack {
       POWERTOOLS_METRICS_NAMESPACE: "outbound",
       POWERTOOLS_LOGGER_LOG_EVENT: `${config.stageProps.environmentMode !== "prod"}`,
     }
+    const commonQueueProps = {
+      visibilityTimeout: Duration.seconds(60),
+      encryption: sqs.QueueEncryption.KMS,
+      encryptionMasterKey: kms.Alias.fromAliasName(this, 'sqs-key-alias', 'aws/sqs'),
+    }
 
     const transQueue = new sst.Queue(this, "TransQueue", {
-      sqsQueue: {
-        visibilityTimeout: Duration.seconds(60),
-      },
+      sqsQueue: commonQueueProps,
       consumer: {
         function: {
           functionName: `${prefix}-transformation`,
@@ -177,9 +180,7 @@ export default class OutboundStack extends sst.Stack {
     ])
 
     const senderQueue = new sst.Queue(this, "SenderQueue", {
-      sqsQueue: {
-        visibilityTimeout: Duration.seconds(60),
-      },
+      sqsQueue: commonQueueProps,
       consumer: {
         function: {
           functionName: `${prefix}-sender`,
