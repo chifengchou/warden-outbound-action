@@ -4,7 +4,7 @@ import * as sst from "@serverless-stack/resources";
 import {Config} from "./config";
 
 const tags = {
-  "horangi-system": "warden-platform",
+  "horangi:system": "warden-platform",
   "horangi:application-owner": "engineering",
   "horangi:cost-center": "warden-platform",
   "horangi:environment": "dev",
