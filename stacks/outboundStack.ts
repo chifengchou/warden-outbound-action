@@ -223,8 +223,16 @@ export default class OutboundStack extends sst.Stack {
     )
 
     // Topics created for Doku who is using AliCloud
-    const cspmTopic = new sst.Topic(this, "DokuCspmTopic")
-    const tdTopic = new sst.Topic(this, "DokuTdTopic")
+    const cspmTopic = new sst.Topic(this, "DokuCspmTopic", {
+      snsTopic: {
+        masterKey: kms.Alias.fromAliasName(this, 'sns-key-alias', 'aws/sns'),
+      }
+    })
+    const tdTopic = new sst.Topic(this, "DokuTdTopic", {
+      snsTopic: {
+        masterKey: kms.Alias.fromAliasName(this, 'sns-key-alias', 'aws/sns'),
+      }
+    })
 
     bus.addRules(this, {
       transformationRule: {
