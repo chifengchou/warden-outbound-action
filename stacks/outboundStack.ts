@@ -141,7 +141,7 @@ export default class OutboundStack extends sst.Stack {
     const commonQueueProps = {
       visibilityTimeout: Duration.seconds(60),
       encryption: sqs.QueueEncryption.KMS,
-      encryptionMasterKey: kms.Alias.fromAliasName(this, 'sqs-key-alias', 'aws/sqs'),
+      encryptionMasterKey: kms.Alias.fromAliasName(this, 'SqsKeyAlias', 'aws/sqs'),
     }
 
     const transQueue = new sst.Queue(this, "TransQueue", {
@@ -223,14 +223,15 @@ export default class OutboundStack extends sst.Stack {
     )
 
     // Topics created for Doku who is using AliCloud
-    const cspmTopic = new sst.Topic(this, "DokuCspmTopic", {
+    const snsMasterKey = kms.Alias.fromAliasName(this, 'SnsKeyAlias', 'aws/sns');
+    new sst.Topic(this, "DokuCspmTopic", {
       snsTopic: {
-        masterKey: kms.Alias.fromAliasName(this, 'sns-key-alias', 'aws/sns'),
+        masterKey: snsMasterKey,
       }
     })
-    const tdTopic = new sst.Topic(this, "DokuTdTopic", {
+    new sst.Topic(this, "DokuTdTopic", {
       snsTopic: {
-        masterKey: kms.Alias.fromAliasName(this, 'sns-key-alias', 'aws/sns'),
+        masterKey: snsMasterKey,
       }
     })
 
