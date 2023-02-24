@@ -93,13 +93,14 @@ export default class OutboundStack extends sst.Stack {
     const srcPath = this.prepare_src_path()
 
     const bus = new sst.EventBus(this, "Bus", {
-      eventBridgeEventBus: {
-        eventBusName: `${prefix}-bus`,
-      }
+      cdk: {
+        eventBus: {
+          eventBusName: `${prefix}-bus`,
+        }
+      },
     });
     const commonFunctionProps = {
       srcPath,
-      runtime: lambda.Runtime.PYTHON_3_8,
       layers: [layer],
       vpc: ec2.Vpc.fromLookup(this, "Vpc", {
         vpcName: `${config.networkLayerStackName}-vpc`
@@ -118,7 +119,6 @@ export default class OutboundStack extends sst.Stack {
             Fn.importValue(`${config.networkLayerStackName}-subnet-app-c-id`)),
         ]
       },
-      timeout: Duration.seconds(20),
     }
     const environment = {
       SENTRY_DSN: config.stageProps.sentryDsn,
@@ -138,26 +138,43 @@ export default class OutboundStack extends sst.Stack {
       POWERTOOLS_METRICS_NAMESPACE: "outbound",
       POWERTOOLS_LOGGER_LOG_EVENT: `${config.stageProps.environmentMode !== "prod"}`,
     }
+
     const commonQueueProps = {
       visibilityTimeout: Duration.seconds(60),
-      encryption: sqs.QueueEncryption.KMS,
-      encryptionMasterKey: kms.Alias.fromAliasName(this, 'SqsKeyAlias', 'aws/sqs'),
+      // https://docs.aws.amazon.com/AWSSimpleQueueService/latest/SQSDeveloperGuide/sqs-configure-sqs-sse-queue.html
+      encryption: sqs.QueueEncryption.SQS_MANAGED,
     }
 
     const transQueue = new sst.Queue(this, "TransQueue", {
-      sqsQueue: commonQueueProps,
+      cdk: {
+        queue: commonQueueProps,
+      },
       consumer: {
         function: {
           functionName: `${prefix}-transformation`,
           handler: "transformation.handler",
+          runtime: "python3.8",
+          timeout: "20 seconds",
           ...commonFunctionProps,
           environment: {
             ...environment,
             POWERTOOLS_SERVICE_NAME: "transformation",
-          }
+          },
+          // transformation handler should be able to putEvents to the bus.
+          permissions: [
+            new iam.PolicyStatement({
+              actions: ["events:putEvents"],
+              effect: iam.Effect.ALLOW,
+              resources: [
+                bus.eventBusArn,
+              ]
+            }),
+          ],
         },
-        consumerProps: {
-          reportBatchItemFailures: true,
+        cdk: {
+          eventSource: {
+            reportBatchItemFailures: true,
+          }
         },
       },
     });
@@ -167,32 +184,44 @@ export default class OutboundStack extends sst.Stack {
     const transFn = transQueue.consumerFunction!
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     this.add_managed_policy(config, transFn.role!, "TransFn")
-    // transformation handler should be able to putEvents to the bus.
-    // `transFn.attachPermissions([[bus, "putEvents"]])` does not work at the moment
-    transFn.attachPermissions([
-      new iam.PolicyStatement({
-        actions: ["events:putEvents"],
-        effect: iam.Effect.ALLOW,
-        resources: [
-          bus.eventBusArn,
-        ]
-      })
-    ])
 
     const senderQueue = new sst.Queue(this, "SenderQueue", {
-      sqsQueue: commonQueueProps,
+      cdk: {
+        queue: commonQueueProps,
+      },
       consumer: {
         function: {
           functionName: `${prefix}-sender`,
           handler: "sender.handler",
+          runtime: "python3.8",
+          timeout: "20 seconds",
           ...commonFunctionProps,
           environment: {
             ...environment,
             POWERTOOLS_SERVICE_NAME: "sender",
-          }
+          },
+          // sender handler should be able to publish to the sns.
+          permissions: [
+            new iam.PolicyStatement({
+              actions: ["sns:publish"],
+              effect: iam.Effect.ALLOW,
+              resources: [
+                "*",
+              ]
+            }),
+            new iam.PolicyStatement({
+              actions: ["kms:Decrypt"],
+              effect: iam.Effect.ALLOW,
+              resources: [
+                Fn.importValue(`${config.platformStackName}-kms-cloud-credentials-key`),
+              ]
+            }),
+          ],
         },
-        consumerProps: {
-          reportBatchItemFailures: true,
+        cdk: {
+          eventSource: {
+            reportBatchItemFailures: true,
+          }
         },
       },
     });
@@ -202,65 +231,64 @@ export default class OutboundStack extends sst.Stack {
     // sets up some policies for us.
     // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
     this.add_managed_policy(config, senderFn.role!, "SenderFn")
-    // sender handler should be able to publish to the sns.
-    senderFn.attachPermissions(
-      [
-        new iam.PolicyStatement({
-          actions: ["sns:publish"],
-          effect: iam.Effect.ALLOW,
-          resources: [
-            "*",
-          ]
-        }),
-        new iam.PolicyStatement({
-          actions: ["kms:Decrypt"],
-          effect: iam.Effect.ALLOW,
-          resources: [
-            Fn.importValue(`${config.platformStackName}-kms-cloud-credentials-key`),
-          ]
-        }),
-      ]
-    )
 
-    // Topics created for Doku who is using AliCloud
+    // Topics(SNS) are where the sender sends message to. Usually they sit in the client's cloud.
+    // Since Doku are using AliCloud, we manage topics for them.
+    // https://docs.aws.amazon.com/sns/latest/dg/sns-enable-encryption-for-topic.html
     const snsMasterKey = kms.Alias.fromAliasName(this, 'SnsKeyAlias', 'aws/sns');
     new sst.Topic(this, "DokuCspmTopic", {
-      snsTopic: {
-        masterKey: snsMasterKey,
+      cdk: {
+        topic: {
+          masterKey: snsMasterKey,
+        }
       }
     })
     new sst.Topic(this, "DokuTdTopic", {
-      snsTopic: {
-        masterKey: snsMasterKey,
+      cdk: {
+        topic: {
+          masterKey: snsMasterKey,
+        }
       }
     })
 
     bus.addRules(this, {
       transformationRule: {
-        ruleName: `${prefix}-to-transformation`,
-        description: "events to be transformed",
-        eventPattern: {
-          detailType: ["OutboundNotification"],
-          detail: {
-            // either no route-state or not in the end state(ready_to_send)
-            "msg_attrs.route": [{exists: false}, {"anything-but": "ready_to_send"}],
-          },
+        cdk: {
+          rule: {
+            ruleName: `${prefix}-to-transformation`,
+            description: "events to be transformed",
+            eventPattern: {
+              detailType: ["OutboundNotification"],
+              detail: {
+                // either no route-state or not in the end state(ready_to_send)
+                "msg_attrs.route": [{exists: false}, {"anything-but": "ready_to_send"}],
+              },
+            },
+          }
         },
-        targets: [transQueue]
+        targets: {
+          transQueue
+        },
       }
-    });
+    })
     bus.addRules(this, {
       senderRule: {
-        ruleName: `${prefix}-to-sender`,
-        description: "events to be sent",
-        eventPattern: {
-          detailType: ["OutboundNotification"],
-          detail: {
-            // the end state(ready_to_send)
-            "msg_attrs.route": ["ready_to_send"]
+        cdk: {
+          rule: {
+            ruleName: `${prefix}-to-sender`,
+            description: "events to be sent",
+            eventPattern: {
+              detailType: ["OutboundNotification"],
+              detail: {
+                // the end state(ready_to_send)
+                "msg_attrs.route": ["ready_to_send"]
+              },
+            },
           },
         },
-        targets: [senderQueue]
+        targets: {
+          senderQueue
+        },
       }
     });
 
