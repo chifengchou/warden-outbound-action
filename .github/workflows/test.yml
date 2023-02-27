@@ -32,3 +32,8 @@ jobs:
         run: |
           git submodule update --init --recursive
       
+      - name: Run test
+        run: |
+          chmod +x ./src/script/run_test.sh
+          ./src/script/run_test.sh
+          
