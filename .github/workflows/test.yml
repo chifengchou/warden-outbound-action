@@ -11,7 +11,7 @@ on:
           - dev
           - prod
 jobs:
-  deploy:
+  test:
     runs-on: ubuntu-latest
     env:
       environment: ${{ github.event.inputs.environment || ((github.ref_type == 'tag') && 'prod') || 'dev' }}
