@@ -1,0 +1,34 @@
+name: Test
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - prod
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      environment: ${{ github.event.inputs.environment || ((github.ref_type == 'tag') && 'prod') || 'dev' }}
+      version: ${{ ((github.ref_type == 'tag') && github.ref) || github.sha }}
+    environment:
+      name: ${{ github.event.inputs.environment || ((github.ref_type == 'tag') && 'prod') || 'dev' }}
+
+    steps:
+      - name: webfactory/ssh-agent
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: |
+            ${{ secrets.TGR_DEV_1_PLATFORM_GITHUB_SSH }}  
+      - name: Check out
+        uses: actions/checkout@v3.3.0
+
+      - name: Update submodules
+        run: |
+          git submodule update --init --recursive
+      
