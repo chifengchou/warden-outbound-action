@@ -9,6 +9,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: test
+      - name: echo
         run: |
-          echo ${{ github.ref }}
+          echo "github.ref=${{ github.ref }}"
+          echo "GITHUB_REF=${{ GITHUB_REF }}"
