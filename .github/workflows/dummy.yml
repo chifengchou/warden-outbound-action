@@ -1,0 +1,14 @@
+name: Dummy
+on:
+  push:
+    branches:
+      - develop
+      - test/*
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: test
+        run: |
+          echo ${{ github.ref }}
