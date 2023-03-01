@@ -1,6 +1,7 @@
 # Getting Started with Serverless Stack (SST)
 
 
+
 This project was bootstrapped with [Create Serverless Stack](https://docs.serverless-stack.com/packages/create-serverless-stack).
 
 Start by installing the dependencies.
