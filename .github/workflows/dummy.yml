@@ -8,10 +8,14 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/develop' }}
+    env:
+      environment: 'dev'
     steps:
       - name: echo
         run: |
           echo "github.ref=${{ github.ref }}"
           echo "github.head_ref=${{ github.head_ref }}"
+          echo "environment=${{ env.environment }}"
 
 
