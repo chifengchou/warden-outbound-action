@@ -7,6 +7,7 @@ on:
 
 jobs:
   setenv:
+    runs-on: ubuntu-latest
     steps:
       - name: match dev
         if: ${{ github.ref == 'refs/heads/develop' }}
