@@ -6,14 +6,22 @@ on:
       - test/*
 
 jobs:
+  setenv:
+    steps:
+      - name: match dev
+        if: ${{ github.ref == 'refs/heads/develop' }}
+        run: |
+          echo "::set-output name=environment::dev"
+
+      
+    
   deploy:
     runs-on: ubuntu-latest
-    if: ${{ github.ref }} == 'refs/heads/develop'
-    env:
-      environment: 'dev'
+    needs: setenv
     steps:
       - name: echo
         run: |
+          echo "environment=${{ env.environment }}"
           echo "github.ref=${{ github.ref }}"
           echo "github.head_ref=${{ github.head_ref }}"
           echo "environment=${{ env.environment }}"
